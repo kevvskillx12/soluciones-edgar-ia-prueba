@@ -6,7 +6,9 @@ use Filament\Pages\Page;
 
 class AIChat extends Page
 {
-    protected static $navigationIcon = 'heroicon-o-document-text';
+    protected static ?string $navigationIcon = 'heroicon-o-chat-bubble-left-right';
 
-    protected static $view = 'filament.pages.a-i-chat';
+    protected static ?string $navigationLabel = 'AI Chat';
+
+    protected static string $view = 'filament.pages.a-i-chat';
 }
