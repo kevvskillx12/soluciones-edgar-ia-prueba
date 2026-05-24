@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\OrderResource\Pages;
 use App\Models\Order;
 use App\Services\Automation\ExternalOrderAutomationService;
+use App\Services\Reports\OrderClosingReportService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -12,6 +13,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Filament\Forms\Components\FileUpload;
 
 class OrderResource extends Resource
@@ -350,6 +352,31 @@ class OrderResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('generate_closing_report_ai')
+                        ->label('Generar reporte de cierre con IA')
+                        ->icon('heroicon-o-sparkles')
+                        ->color('primary')
+                        ->action(function (Collection $records) {
+                            try {
+                                $reportService = app(OrderClosingReportService::class);
+                                $result = $reportService->generate($records);
+                                
+                                Notification::make()
+                                    ->title($result['title'])
+                                    ->body("Reporte generado correctamente. Revisa el archivo descargado para ver el resumen completo de la IA.")
+                                    ->success()
+                                    ->send();
+                                    
+                                return response()->download($result['absolute_path'], basename($result['file_path']));
+                            } catch (\Throwable $e) {
+                                Notification::make()
+                                    ->title('Error al generar reporte')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        })
+                        ->deselectRecordsAfterCompletion(),
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
