@@ -4,8 +4,10 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\OrderResource\Pages;
 use App\Models\Order;
+use App\Services\Automation\ExternalOrderAutomationService;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -97,6 +99,59 @@ class OrderResource extends Resource
                             ->label('Notas del Admin')
                             ->columnSpanFull(),
                     ]),
+
+                Forms\Components\Section::make('Información de API Externa')
+                    ->description('Datos del procesamiento por proveedor externo. Estos campos son de solo lectura.')
+                    ->icon('heroicon-o-server-stack')
+                    ->collapsible()
+                    ->collapsed(fn (?Order $record): bool => !($record?->processed_by_api ?? false))
+                    ->schema([
+                        Forms\Components\Grid::make(3)
+                            ->schema([
+                                Forms\Components\TextInput::make('api_status')
+                                    ->label('Estado API')
+                                    ->disabled()
+                                    ->dehydrated(false)
+                                    ->placeholder('Sin procesar'),
+                                Forms\Components\TextInput::make('external_provider')
+                                    ->label('Proveedor Externo')
+                                    ->disabled()
+                                    ->dehydrated(false)
+                                    ->placeholder('—'),
+                                Forms\Components\TextInput::make('external_order_id')
+                                    ->label('ID Orden Externa')
+                                    ->disabled()
+                                    ->dehydrated(false)
+                                    ->placeholder('—'),
+                            ]),
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\DateTimePicker::make('api_processed_at')
+                                    ->label('Fecha de Procesamiento API')
+                                    ->disabled()
+                                    ->dehydrated(false),
+                                Forms\Components\TextInput::make('processed_by_api')
+                                    ->label('Procesado por API')
+                                    ->disabled()
+                                    ->dehydrated(false)
+                                    ->formatStateUsing(fn ($state) => $state ? '✅ Sí' : '❌ No'),
+                            ]),
+                        Forms\Components\Textarea::make('api_report')
+                            ->label('Reporte de API')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->rows(5)
+                            ->columnSpanFull()
+                            ->placeholder('Sin reporte disponible.'),
+                        Forms\Components\Textarea::make('api_error_message')
+                            ->label('Mensaje de Error API')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->rows(3)
+                            ->columnSpanFull()
+                            ->placeholder('Sin errores.')
+                            ->visible(fn (?Order $record): bool => !empty($record?->api_error_message)),
+                    ]),
             ]);
     }
 
@@ -134,6 +189,52 @@ class OrderResource extends Resource
                         'rejected' => 'Rechazado',
                         default => $state,
                     }),
+                Tables\Columns\IconColumn::make('processed_by_api')
+                    ->label('API')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-badge')
+                    ->falseIcon('heroicon-o-minus-circle')
+                    ->trueColor('success')
+                    ->falseColor('gray')
+                    ->tooltip(fn (Order $record): string => $record->processed_by_api
+                        ? 'Procesado por API externa'
+                        : 'No procesado por API')
+                    ->alignCenter(),
+                Tables\Columns\TextColumn::make('api_status')
+                    ->label('Estado API')
+                    ->badge()
+                    ->color(fn (?string $state): string => match ($state) {
+                        'sent' => 'info',
+                        'processing' => 'info',
+                        'completed' => 'success',
+                        'failed' => 'danger',
+                        'manual_review' => 'warning',
+                        default => 'gray',
+                    })
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                        'sent' => 'Enviado',
+                        'processing' => 'Procesando',
+                        'completed' => 'Completado',
+                        'failed' => 'Fallido',
+                        'manual_review' => 'Revisión manual',
+                        null => '—',
+                        default => $state,
+                    })
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('external_provider')
+                    ->label('Proveedor')
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('external_order_id')
+                    ->label('Orden Externa')
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->copyable(),
+                Tables\Columns\TextColumn::make('api_processed_at')
+                    ->label('Fecha API')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Fecha')
                     ->dateTime()
@@ -158,6 +259,20 @@ class OrderResource extends Resource
                         'completed' => 'Completado',
                         'rejected' => 'Rechazado',
                     ]),
+                Tables\Filters\SelectFilter::make('api_status')
+                    ->label('Estado API')
+                    ->options([
+                        'sent' => 'Enviado',
+                        'processing' => 'Procesando',
+                        'completed' => 'Completado',
+                        'failed' => 'Fallido',
+                        'manual_review' => 'Revisión manual',
+                    ]),
+                Tables\Filters\TernaryFilter::make('processed_by_api')
+                    ->label('Procesado por API')
+                    ->placeholder('Todos')
+                    ->trueLabel('Sí')
+                    ->falseLabel('No'),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
@@ -187,13 +302,51 @@ class OrderResource extends Resource
                             'status' => 'completed',
                         ]);
 
-                            \Filament\Notifications\Notification::make()
+                            Notification::make()
                                 ->title('Trámite completado')
                                 ->body('El archivo se guardó y el correo se enviará automáticamente.')
                                 ->success()
                                 ->send();
                     })
                     ->visible(fn (Order $record) => $record->status !== 'completed'),
+                Tables\Actions\Action::make('process_api')
+                    ->label('Procesar por API externa')
+                    ->icon('heroicon-o-bolt')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Procesar por API externa')
+                    ->modalDescription('¿Estás seguro de enviar este pedido al proveedor externo? Si la API no está habilitada, se ejecutará en modo simulación.')
+                    ->modalSubmitActionLabel('Sí, procesar')
+                    ->action(function (Order $record): void {
+                        try {
+                            $automationService = app(ExternalOrderAutomationService::class);
+                            $result = $automationService->process($record);
+
+                            if ($result['success'] ?? false) {
+                                Notification::make()
+                                    ->title('Procesamiento exitoso')
+                                    ->body($result['message'] ?? 'El pedido fue procesado correctamente.')
+                                    ->success()
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->title('Error en el procesamiento')
+                                    ->body($result['message'] ?? 'Ocurrió un error al procesar el pedido.')
+                                    ->danger()
+                                    ->send();
+                            }
+                        } catch (\Throwable $e) {
+                            Notification::make()
+                                ->title('Error inesperado')
+                                ->body('Error: ' . $e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    })
+                    ->visible(fn (Order $record): bool =>
+                        $record->status !== 'completed'
+                        && $record->api_status !== 'completed'
+                    ),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

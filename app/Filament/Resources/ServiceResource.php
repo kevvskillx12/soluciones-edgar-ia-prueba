@@ -107,6 +107,44 @@ class ServiceResource extends Resource
                             ->required(),
                     ]),
 
+                Forms\Components\Section::make('Automatización por API Externa')
+                    ->description('Configura cómo se procesa este servicio: manual, semi-automático o automático vía proveedor externo.')
+                    ->icon('heroicon-o-bolt')
+                    ->collapsible()
+                    ->collapsed()
+                    ->schema([
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\Select::make('automation_type')
+                                    ->label('Tipo de Automatización')
+                                    ->options([
+                                        'manual' => 'Manual',
+                                        'semi_automatic' => 'Semi automático',
+                                        'automatic' => 'Automático',
+                                    ])
+                                    ->default('manual')
+                                    ->required()
+                                    ->native(false)
+                                    ->helperText('Manual: procesamiento humano. Semi automático: requiere revisión antes de enviar. Automático: se envía directamente al proveedor.'),
+                                Forms\Components\Select::make('external_provider')
+                                    ->label('Proveedor Externo')
+                                    ->options([
+                                        'dhru' => 'Dhru',
+                                    ])
+                                    ->native(false)
+                                    ->placeholder('Ninguno')
+                                    ->helperText('Selecciona el proveedor API que procesará este servicio.'),
+                                Forms\Components\TextInput::make('external_service_id')
+                                    ->label('ID del Servicio Externo')
+                                    ->placeholder('Ej: 123 o test')
+                                    ->helperText('Identificador del servicio en el catálogo del proveedor externo.'),
+                                Forms\Components\TextInput::make('api_handler')
+                                    ->label('Manejador / Flujo API')
+                                    ->placeholder('Ej: default, imei_check, unlock')
+                                    ->helperText('Nombre del flujo o handler personalizado para este servicio (opcional).'),
+                            ]),
+                    ]),
+
                 Forms\Components\Section::make('Campos Personalizados (Formulario)')
                     ->description('Agrega campos extra que el usuario debe llenar al solicitar este servicio.')
                     ->schema([
@@ -168,6 +206,35 @@ class ServiceResource extends Resource
                          ->prefix('Tiempo estimado: ')
                          ->color('gray')
                          ->size(Tables\Columns\TextColumn\TextColumnSize::Small),
+
+                    Tables\Columns\TextColumn::make('automation_type')
+                        ->label('Automatización')
+                        ->badge()
+                        ->color(fn (string $state): string => match ($state) {
+                            'manual' => 'gray',
+                            'semi_automatic' => 'warning',
+                            'automatic' => 'success',
+                            default => 'gray',
+                        })
+                        ->formatStateUsing(fn (string $state): string => match ($state) {
+                            'manual' => 'Manual',
+                            'semi_automatic' => 'Semi automático',
+                            'automatic' => 'Automático',
+                            default => $state,
+                        })
+                        ->icon(fn (string $state): string => match ($state) {
+                            'automatic' => 'heroicon-m-bolt',
+                            'semi_automatic' => 'heroicon-m-adjustments-horizontal',
+                            default => 'heroicon-m-hand-raised',
+                        }),
+
+                    Tables\Columns\TextColumn::make('external_provider')
+                        ->label('Proveedor')
+                        ->badge()
+                        ->color('info')
+                        ->placeholder('—')
+                        ->formatStateUsing(fn (?string $state): string => $state ? strtoupper($state) : '—')
+                        ->visible(fn (?string $state): bool => !empty($state)),
 
                     Tables\Columns\TextColumn::make('pending')
                          ->counts('orders', fn (Builder $query) => $query->whereIn('status', ['pending', 'processing']))
