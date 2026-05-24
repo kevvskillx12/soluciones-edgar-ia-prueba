@@ -20,7 +20,12 @@ class Service extends Model
         'image_path',
         'is_active',
         'active_schedule',
-        'form_schema'
+        'form_schema',
+        // Campos de automatización por API externa
+        'automation_type',
+        'external_provider',
+        'external_service_id',
+        'api_handler',
     ];
 
     protected $casts = [

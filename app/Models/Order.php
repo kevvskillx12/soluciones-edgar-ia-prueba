@@ -17,10 +17,19 @@ class Order extends Model
         'price_at_purchase',
         'service_cost_snapshot',
         'service_price_snapshot',
+        'processed_by_api',
+        'api_status',
+        'api_report',
+        'api_error_message',
+        'api_processed_at',
+        'external_provider',
+        'external_order_id',
     ];
 
     protected $casts = [
         'input_data' => 'array',
+        'processed_by_api' => 'boolean',
+        'api_processed_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

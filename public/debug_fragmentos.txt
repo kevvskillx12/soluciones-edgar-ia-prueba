@@ -1,4 +1,4 @@
-PREGUNTA: que puedo hacer en los distintos apartados de la app?
+PREGUNTA: está en el user seeders, buscalo y damelo
 
 --- FRAGMENTO 1 ---
 Soluciones Edgar es una plataforma web de gestión de trámites y servicios digitales. El sistema permite a los usuarios solicitar, rastrear y recibir resultados de trámites a través de internet.
@@ -82,22 +82,24 @@ El campo name es obligatorio.
 El
 
 --- FRAGMENTO 6 ---
-eja estados de pedidos: pending, processing, completed y rejected.
-El sistema permite guardar archivos de resultado para pedidos completados mediante result_file_path.
-El sistema permite guardar notas administrativas en pedidos.
-El sistema permite registrar solicitudes de depósito con banco, clave de rastreo, monto, comprobante y estado.
-El sistema maneja estados de depósito: pending, approved y rejected.
-El sistema registra movimientos de saldo mediante transacciones de tipo deposit, purchase y refund.
-El sistema permite organizar servicios mediante categorías.
-El sistema permite registrar solicitudes de soporte, principalmente de tipo whatsapp.
-El sistema permite registrar actividad importante mediante activity_logs.
-El sistema incluye una integración básica de IA con Ollama mediante la ruta /ia-test.
-OrderResource es el recurso de Filament encargado de administrar los pedidos o trámites del sistema.
-El recurso usa el modelo Order.
-En la navegación de Filament, OrderResource aparece con el nombre Gestión de Trámites.
-El grupo de navegación de OrderResource es Operaciones.
-El formulario de OrderResource tiene una sección llamada Información del Pedido.
-En Información del Pedido
+s pedidos mediante la relación orders.
+Un servicio pertenece a una categoría mediante la relación category.
+El seeder ServicesSeeder crea o actualiza el catálogo inicial de servicios disponibles en el sistema.
+Cada servicio registrado por el seeder tiene código, nombre, descripción, precio, tipo de servicio, tiempo de procesamiento y formulario requerido.
+El seeder también asigna imágenes a los servicios mediante un mapeo manual de códigos de servicio con archivos de imagen.
+Cada servicio se registra como activo.
+El seeder calcula el costo interno del servicio. Si no existe un costo definido, usa el 70% del precio como costo aproximado.
+Los servicios se crean o actualizan usando updateOrCreate con el código del servicio. Esto evita duplicar servicios cuando el seeder se ejecuta varias veces.
+El sistema maneja varias categorías o tipos de servicios:
+- ACTAS
+- SAT
+- SINDOS IMSS
+- SERVICIOS
+- INFONAVIT
+- VEHICULOS
+El sistema también migra los tipos antiguos de servicio hacia categorías nuevas.
+El tipo ACTAS se convierte en la categoría Actas, con descripción de servicios de actas civiles.
+El tipo SAT se convierte en la categoría SAT, relacionada con trámites de Hacienda y Crédito
 
 --- FRAGMENTO 7 ---
 uario no es administrador y no tiene saldo suficiente, el sistema lanza el error Saldo insuficiente y no realiza el descuento.
@@ -117,40 +119,6 @@ Un pedido pertenece a un usuario y pertenece a un servicio.
 Guarda el usuario relacionado, si existe, el tipo de soporte y las fechas de creación y
 
 --- FRAGMENTO 8 ---
-stado.
-DepositRequestResource tiene una acción llamada Aprobar y Abonar.
-La acción Aprobar y Abonar solo es visible para administradores y solo cuando la solicitud está pending.
-La aprobación requiere confirmación.
-Al aprobar, el sistema usa una transacción de base de datos.
-El sistema bloquea el registro con lockForUpdate para evitar condiciones de carrera.
-Si la solicitud ya fue procesada antes, el sistema muestra una notificación de error y no la vuelve a procesar.
-Si sigue pendiente, el sistema cambia el estado a approved.
-El comentario del código indica que DepositRequestObserver se encarga de agregar el saldo y notificar al usuario cuando se aprueba el depósito.
-DepositRequestResource tiene una acción llamada Rechazar.
-La acción Rechazar solo es visible para administradores y solo cuando la solicitud está pending.
-Para rechazar, el administrador debe escribir un motivo.
-Al rechazar, el sistema cambia el estado a rejected y guarda el motivo en admin_notes.
-DepositRequestResource también tiene una acción ViewAction para ver la solicitud.
-La eliminación masiva solo es visible para administradores.
-Al eliminar solicitudes en masa, el sistema no elimina solicitudes
-
---- FRAGMENTO 9 ---
-textarea para escribir una pregunta, un botón Enviar y un área para mostrar la respuesta.
-Cuando el usuario envía una pregunta desde el dashboard, se ejecuta una función JavaScript llamada sendAI.
-La función sendAI manda una petición POST a /ia-test con la pregunta escrita por el usuario.
-La respuesta se muestra directamente en la misma página.
-Esto significa que el dashboard tiene una integración básica con la IA usando la ruta /ia-test.
-La vista welcome.blade.php conserva la plantilla base de Laravel.
-Esta pantalla incluye enlaces y contenido general de Laravel como Documentation, Laracasts, Laravel News y Vibrant Ecosystem.
-Esta vista no representa una pantalla personalizada del negocio Soluciones Edgar.
-Para el RAG, no debe tomarse como una funcionalidad principal del sistema, sino como una vista base de Laravel que todavía existe en el proyecto.
-El sistema tiene páginas de Filament para el recurso de órdenes.
-La página CreateOrder permite crear nuevos pedidos desde Filament.
-Antes de crear un pedido, CreateOrder revisa el usuario y el servicio seleccionados.
-Si el usuario o el servicio no existen, el sistema devuelve los datos sin aplicar validaciones adicionales.
-Si el
-
---- FRAGMENTO 10 ---
 n servicio puede tener muchos pedidos.
 Un servicio pertenece a una categoría.
 Un pedido pertenece a un usuario.
@@ -169,39 +137,72 @@ El sistema maneja estados de pedidos: pending, processing, completed y rejected.
 El sistema permite guardar archivos de resultado para pedidos completados mediante result_file_path.
 El sistema permite guardar notas
 
+--- FRAGMENTO 9 ---
+hivos de resultado de pedidos mediante el disco s3.
+Tiene una integración básica de IA con Ollama usando el modelo llama3.2:1b mediante una ruta que consulta http://localhost:11434/api/generate.
+Según el código de web.php, la ruta /ia-test hace una consulta directa a Ollama. En ese archivo no se observa recuperación vectorial ni consulta RAG. Si el sistema usa RAG, esa lógica debe estar en otro archivo o script aparte.
+El sistema utiliza un seeder principal llamado DatabaseSeeder.
+DatabaseSeeder ejecuta dos seeders principales:
+- AdminSeeder
+- ServicesSeeder
+AdminSeeder se encarga de crear o actualizar el usuario administrador inicial del sistema.
+ServicesSeeder se encarga de crear o actualizar el catálogo inicial de servicios disponibles en el sistema.
+Esto permite preparar automáticamente la base de datos con un administrador inicial y una lista de servicios para que el sistema pueda funcionar desde el inicio.
+El sistema cuenta con un usuario administrador principal.
+Este administrador se crea automáticamente mediante AdminSeeder.
+El administrador tiene el campo is_admin activado como true, lo que permite identificarlo como usuario administrador dentro del sistema.
+El correo del
+
+--- FRAGMENTO 10 ---
+eja estados de pedidos: pending, processing, completed y rejected.
+El sistema permite guardar archivos de resultado para pedidos completados mediante result_file_path.
+El sistema permite guardar notas administrativas en pedidos.
+El sistema permite registrar solicitudes de depósito con banco, clave de rastreo, monto, comprobante y estado.
+El sistema maneja estados de depósito: pending, approved y rejected.
+El sistema registra movimientos de saldo mediante transacciones de tipo deposit, purchase y refund.
+El sistema permite organizar servicios mediante categorías.
+El sistema permite registrar solicitudes de soporte, principalmente de tipo whatsapp.
+El sistema permite registrar actividad importante mediante activity_logs.
+El sistema incluye una integración básica de IA con Ollama mediante la ruta /ia-test.
+OrderResource es el recurso de Filament encargado de administrar los pedidos o trámites del sistema.
+El recurso usa el modelo Order.
+En la navegación de Filament, OrderResource aparece con el nombre Gestión de Trámites.
+El grupo de navegación de OrderResource es Operaciones.
+El formulario de OrderResource tiene una sección llamada Información del Pedido.
+En Información del Pedido
+
 --- FRAGMENTO 11 ---
-ene una acción llamada Subir Resultado.
-La acción Subir Resultado permite subir un PDF, agregar notas y actualizar el pedido.
-Cuando se sube el resultado, el sistema guarda result_file_path, actualiza admin_notes si existen y cambia el estado del pedido a completed.
-Después de subir el resultado, Filament muestra una notificación de Trámite completado.
-La acción Subir Resultado solo aparece cuando el pedido todavía no está completed.
-La tabla de pedidos se ordena por created_at de forma descendente.
-Las páginas de OrderResource son index, create y edit.
-ServiceResource es el recurso de Filament encargado de administrar el catálogo de servicios.
-El recurso usa el modelo Service.
-En la navegación de Filament, ServiceResource aparece como Catálogo de Servicios.
-El grupo de navegación de ServiceResource es Operaciones.
-ServiceResource tiene prioridad de navegación antes que OrderResource porque su navigationSort es 1.
-El formulario de ServiceResource tiene una sección llamada Información Principal.
-En Información Principal se editan datos básicos como código, nombre, categoría, tipo legacy y descripción.
-El campo code representa el código único del servicio.
-El campo code es
+stado.
+DepositRequestResource tiene una acción llamada Aprobar y Abonar.
+La acción Aprobar y Abonar solo es visible para administradores y solo cuando la solicitud está pending.
+La aprobación requiere confirmación.
+Al aprobar, el sistema usa una transacción de base de datos.
+El sistema bloquea el registro con lockForUpdate para evitar condiciones de carrera.
+Si la solicitud ya fue procesada antes, el sistema muestra una notificación de error y no la vuelve a procesar.
+Si sigue pendiente, el sistema cambia el estado a approved.
+El comentario del código indica que DepositRequestObserver se encarga de agregar el saldo y notificar al usuario cuando se aprueba el depósito.
+DepositRequestResource tiene una acción llamada Rechazar.
+La acción Rechazar solo es visible para administradores y solo cuando la solicitud está pending.
+Para rechazar, el administrador debe escribir un motivo.
+Al rechazar, el sistema cambia el estado a rejected y guarda el motivo en admin_notes.
+DepositRequestResource también tiene una acción ViewAction para ver la solicitud.
+La eliminación masiva solo es visible para administradores.
+Al eliminar solicitudes en masa, el sistema no elimina solicitudes
 
 --- FRAGMENTO 12 ---
-l usuario autenticado sea administrador.
-Si el usuario no es dueño del pedido y tampoco es administrador, el sistema devuelve error 403.
-Si el pedido no tiene archivo de resultado, el sistema devuelve error 404.
-Cuando el pedido sí tiene archivo de resultado, el sistema descarga el archivo desde el disco s3 usando la ruta guardada en result_file_path.
-El archivo se entrega con un nombre parecido a Resultado_ID.pdf.
-Esto significa que los documentos de resultado no se descargan libremente. Solo el cliente dueño del pedido o un administrador pueden descargar el resultado.
-La tabla deposit_requests guarda solicitudes de depósito o recarga de saldo realizadas por los usuarios.
-Cada solicitud de depósito pertenece a un usuario mediante user_id.
-Si el usuario se elimina, sus solicitudes de depósito también se eliminan.
-Cada solicitud guarda bank_name, tracking_key, amount, proof_image_path, status y admin_notes.
-El campo bank_name guarda el nombre del banco.
-El campo tracking_key guarda la clave de rastreo.
-La clave de rastreo tracking_key debe ser única.
-El campo amount guarda el monto del depósito.
-El campo proof_image_path guarda la ruta del comprobante de pago.
-Cada solicitud de
+e creación.
+El sistema usa la tabla sessions para guardar información de sesiones activas, como id de sesión, usuario relacionado, dirección IP, navegador o dispositivo usado, datos de sesión y última actividad.
+El modelo User usa autenticación de Laravel y notificaciones.
+El usuario debe verificar su correo electrónico porque el modelo User implementa MustVerifyEmail.
+El sistema usa notificaciones personalizadas para enviar correos de verificación y recuperación de contraseña.
+El modelo User tiene campos como name, email, password, balance, is_admin, company_name, phone, account_type, is_verified_company y email_verified_at.
+El campo password está oculto para serialización, junto con remember_token.
+El campo email_verified_at se convierte a tipo datetime.
+El campo password se maneja como hashed.
+El campo is_admin se maneja como booleano.
+El sistema maneja usuarios normales y usuarios administradores.
+La tabla users tiene un campo llamado is_admin.
+El campo is_admin indica si un usuario es administrador o no.
+Por defecto, is_admin es false. Esto significa que un usuario normal no es administrador.
+Cuando is_admin es true, el usuario puede ser tratado como administrador dentro del
 
