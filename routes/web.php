@@ -61,6 +61,19 @@ Route::post('/ia-test', function () {
 
         $pregunta = request('pregunta', 'Hola');
 
+        if (auth()->check() && auth()->user()->is_admin) {
+            $commandService = app(\App\Services\AI\AdminChatCommandService::class);
+            $commandResult = $commandService->handle($pregunta, auth()->user());
+            
+            if ($commandResult && $commandResult['handled']) {
+                return response()->json([
+                    'respuesta' => $commandResult['respuesta'],
+                    'file_path' => $commandResult['file_path'] ?? null,
+                    'url' => $commandResult['url'] ?? null,
+                ], 200, [], JSON_UNESCAPED_UNICODE);
+            }
+        }
+
         $pythonPath = base_path('rag/venv/bin/python');
         $scriptPath = base_path('rag/rag_bridge.py');
 

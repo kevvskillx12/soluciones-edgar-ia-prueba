@@ -1,4 +1,4 @@
-PREGUNTA: está en el user seeders, buscalo y damelo
+PREGUNTA: cómo se procesan los pedidos
 
 --- FRAGMENTO 1 ---
 Soluciones Edgar es una plataforma web de gestión de trámites y servicios digitales. El sistema permite a los usuarios solicitar, rastrear y recibir resultados de trámites a través de internet.
@@ -11,21 +11,6 @@ Usa Eloquent ORM para manejar modelos y relaciones de base de datos.
 Usa migrations de
 
 --- FRAGMENTO 2 ---
-licitudes de depósito y otros módulos del sistema.
-El sistema Soluciones Edgar está construido con Laravel y PHP.
-Usa Eloquent ORM para manejar modelos y relaciones de base de datos.
-Usa migrations de Laravel para crear y modificar tablas.
-Usa seeders de Laravel para cargar datos iniciales, como el administrador inicial y el catálogo de servicios.
-Usa Filament para construir paneles de administración y recursos de gestión.
-Usa Livewire Volt para las páginas de autenticación como registro, login, recuperación de contraseña, confirmación de contraseña y verificación de correo.
-Usa el sistema de notificaciones de Laravel para enviar correos de verificación y recuperación de contraseña.
-Usa relaciones de Eloquent como hasMany y belongsTo para conectar usuarios, servicios, pedidos, depósitos, transacciones y categorías.
-Usa relaciones polimórficas para conectar transacciones y registros de actividad con diferentes modelos del sistema.
-Usa almacenamiento compatible con S3 para descargar archivos de resultado de pedidos mediante el disco s3.
-Tiene una integración básica de IA con Ollama usando el modelo llama3.2:1b mediante una ruta que consulta http://localhost:11434/api/generate.
-Según
-
---- FRAGMENTO 3 ---
 PDF de pedidos y al hacerlo cambia el pedido a completed.
 La descarga de PDF solo se muestra cuando el pedido está completed y tiene result_file_path.
 El sistema de depósitos tiene monto mínimo de 300 pesos según DepositRequestResource.
@@ -40,7 +25,7 @@ Los estados de un pedido son pending, processing, completed y rejected.
 Pending significa que el pedido está pendiente.
 Processing significa
 
---- FRAGMENTO 4 ---
+--- FRAGMENTO 3 ---
 ard.pages.buy-service con el id del servicio.
 La acción SOLICITAR solo es visible si el servicio está activo.
 ServiceResource también tiene acción de editar.
@@ -61,7 +46,58 @@ El campo tracking_key guarda la clave de rastreo o referencia.
 El tracking_key es obligatorio y único.
 El
 
+--- FRAGMENTO 4 ---
+eja estados de pedidos: pending, processing, completed y rejected.
+El sistema permite guardar archivos de resultado para pedidos completados mediante result_file_path.
+El sistema permite guardar notas administrativas en pedidos.
+El sistema permite registrar solicitudes de depósito con banco, clave de rastreo, monto, comprobante y estado.
+El sistema maneja estados de depósito: pending, approved y rejected.
+El sistema registra movimientos de saldo mediante transacciones de tipo deposit, purchase y refund.
+El sistema permite organizar servicios mediante categorías.
+El sistema permite registrar solicitudes de soporte, principalmente de tipo whatsapp.
+El sistema permite registrar actividad importante mediante activity_logs.
+El sistema incluye una integración básica de IA con Ollama mediante la ruta /ia-test.
+OrderResource es el recurso de Filament encargado de administrar los pedidos o trámites del sistema.
+El recurso usa el modelo Order.
+En la navegación de Filament, OrderResource aparece con el nombre Gestión de Trámites.
+El grupo de navegación de OrderResource es Operaciones.
+El formulario de OrderResource tiene una sección llamada Información del Pedido.
+En Información del Pedido
+
 --- FRAGMENTO 5 ---
+licitudes de depósito y otros módulos del sistema.
+El sistema Soluciones Edgar está construido con Laravel y PHP.
+Usa Eloquent ORM para manejar modelos y relaciones de base de datos.
+Usa migrations de Laravel para crear y modificar tablas.
+Usa seeders de Laravel para cargar datos iniciales, como el administrador inicial y el catálogo de servicios.
+Usa Filament para construir paneles de administración y recursos de gestión.
+Usa Livewire Volt para las páginas de autenticación como registro, login, recuperación de contraseña, confirmación de contraseña y verificación de correo.
+Usa el sistema de notificaciones de Laravel para enviar correos de verificación y recuperación de contraseña.
+Usa relaciones de Eloquent como hasMany y belongsTo para conectar usuarios, servicios, pedidos, depósitos, transacciones y categorías.
+Usa relaciones polimórficas para conectar transacciones y registros de actividad con diferentes modelos del sistema.
+Usa almacenamiento compatible con S3 para descargar archivos de resultado de pedidos mediante el disco s3.
+Tiene una integración básica de IA con Ollama usando el modelo llama3.2:1b mediante una ruta que consulta http://localhost:11434/api/generate.
+Según
+
+--- FRAGMENTO 6 ---
+ene una acción llamada Subir Resultado.
+La acción Subir Resultado permite subir un PDF, agregar notas y actualizar el pedido.
+Cuando se sube el resultado, el sistema guarda result_file_path, actualiza admin_notes si existen y cambia el estado del pedido a completed.
+Después de subir el resultado, Filament muestra una notificación de Trámite completado.
+La acción Subir Resultado solo aparece cuando el pedido todavía no está completed.
+La tabla de pedidos se ordena por created_at de forma descendente.
+Las páginas de OrderResource son index, create y edit.
+ServiceResource es el recurso de Filament encargado de administrar el catálogo de servicios.
+El recurso usa el modelo Service.
+En la navegación de Filament, ServiceResource aparece como Catálogo de Servicios.
+El grupo de navegación de ServiceResource es Operaciones.
+ServiceResource tiene prioridad de navegación antes que OrderResource porque su navigationSort es 1.
+El formulario de ServiceResource tiene una sección llamada Información Principal.
+En Información Principal se editan datos básicos como código, nombre, categoría, tipo legacy y descripción.
+El campo code representa el código único del servicio.
+El campo code es
+
+--- FRAGMENTO 7 ---
 equestResource también tiene una acción ViewAction para ver la solicitud.
 La eliminación masiva solo es visible para administradores.
 Al eliminar solicitudes en masa, el sistema no elimina solicitudes aprobadas.
@@ -81,7 +117,59 @@ En Información Personal se editan nombre, correo, contraseña, fecha de verific
 El campo name es obligatorio.
 El
 
---- FRAGMENTO 6 ---
+--- FRAGMENTO 8 ---
+tas, SAT, IMSS, servicios generales, Infonavit y vehículos.
+Los estados de un pedido son pending, processing, completed y rejected.
+Pending significa que el pedido está pendiente.
+Processing significa que el pedido está en proceso.
+Completed significa que el pedido fue completado.
+Rejected significa que el pedido fue rechazado.
+Un pedido guarda el usuario, servicio, datos ingresados, estado, archivo de resultado, notas administrativas, precio de compra, costo del servicio al momento de la compra y precio del servicio al momento de la compra.
+form_schema es el campo JSON de servicios que guarda la estructura del formulario dinámico que debe llenar el usuario.
+input_data es el campo de pedidos donde se guardan los datos que el usuario ingresó al solicitar un servicio.
+Un administrador se identifica mediante el campo is_admin en true.
+El saldo se guarda en el campo balance del usuario. El sistema puede incrementar saldo con credit o addBalance y descontarlo con subtractBalance.
+Si el usuario no es administrador y no tiene saldo suficiente, el sistema lanza el error Saldo insuficiente y no realiza el descuento.
+Los tipos de transacciones son deposit, purchase y refund.
+Los estados de
+
+--- FRAGMENTO 9 ---
+uario no es administrador y no tiene saldo suficiente, el sistema lanza el error Saldo insuficiente y no realiza el descuento.
+Los tipos de transacciones son deposit, purchase y refund.
+Los estados de una solicitud de depósito son pending, approved y rejected.
+price es el precio que paga el cliente. cost es el costo interno del servicio.
+Para conservar el precio original del servicio al momento de la compra, aunque después el precio cambie.
+Son copias del costo y precio del servicio al momento en que se creó el pedido.
+Los datos iniciales se cargan con DatabaseSeeder, que ejecuta AdminSeeder y ServicesSeeder.
+ServicesSeeder crea o actualiza el catálogo inicial de servicios del sistema.
+AdminSeeder crea o actualiza el usuario administrador inicial del sistema.
+DatabaseSeeder ejecuta los seeders principales para cargar datos iniciales del sistema.
+El sistema maneja categorías como Actas, SAT, IMSS, Servicios Generales, Infonavit y Vehículos.
+Un usuario puede tener muchos pedidos.
+Un servicio puede tener muchos pedidos.
+Un pedido pertenece a un usuario y pertenece a un servicio.
+Guarda el usuario relacionado, si existe, el tipo de soporte y las fechas de creación y
+
+--- FRAGMENTO 10 ---
+n servicio puede tener muchos pedidos.
+Un servicio pertenece a una categoría.
+Un pedido pertenece a un usuario.
+Un pedido pertenece a un servicio.
+Una solicitud de depósito pertenece a un usuario.
+Una transacción pertenece a un usuario.
+Una transacción puede estar relacionada con otra entidad mediante una referencia polimórfica.
+Un registro de actividad puede estar relacionado con un usuario y con diferentes elementos del sistema mediante una relación polimórfica.
+El sistema permite registrar usuarios y verificar sus correos electrónicos.
+El sistema permite distinguir entre usuarios normales y administradores mediante el campo is_admin.
+El sistema permite manejar saldo de usuario mediante el campo balance.
+El sistema permite registrar servicios con precio, costo, categoría, imagen, horario, estado activo y formulario dinámico.
+El sistema permite que los usuarios realicen pedidos asociados a servicios.
+El sistema guarda los datos ingresados por el usuario en input_data.
+El sistema maneja estados de pedidos: pending, processing, completed y rejected.
+El sistema permite guardar archivos de resultado para pedidos completados mediante result_file_path.
+El sistema permite guardar notas
+
+--- FRAGMENTO 11 ---
 s pedidos mediante la relación orders.
 Un servicio pertenece a una categoría mediante la relación category.
 El seeder ServicesSeeder crea o actualiza el catálogo inicial de servicios disponibles en el sistema.
@@ -101,108 +189,19 @@ El sistema también migra los tipos antiguos de servicio hacia categorías nueva
 El tipo ACTAS se convierte en la categoría Actas, con descripción de servicios de actas civiles.
 El tipo SAT se convierte en la categoría SAT, relacionada con trámites de Hacienda y Crédito
 
---- FRAGMENTO 7 ---
-uario no es administrador y no tiene saldo suficiente, el sistema lanza el error Saldo insuficiente y no realiza el descuento.
-Los tipos de transacciones son deposit, purchase y refund.
-Los estados de una solicitud de depósito son pending, approved y rejected.
-price es el precio que paga el cliente. cost es el costo interno del servicio.
-Para conservar el precio original del servicio al momento de la compra, aunque después el precio cambie.
-Son copias del costo y precio del servicio al momento en que se creó el pedido.
-Los datos iniciales se cargan con DatabaseSeeder, que ejecuta AdminSeeder y ServicesSeeder.
-ServicesSeeder crea o actualiza el catálogo inicial de servicios del sistema.
-AdminSeeder crea o actualiza el usuario administrador inicial del sistema.
-DatabaseSeeder ejecuta los seeders principales para cargar datos iniciales del sistema.
-El sistema maneja categorías como Actas, SAT, IMSS, Servicios Generales, Infonavit y Vehículos.
-Un usuario puede tener muchos pedidos.
-Un servicio puede tener muchos pedidos.
-Un pedido pertenece a un usuario y pertenece a un servicio.
-Guarda el usuario relacionado, si existe, el tipo de soporte y las fechas de creación y
-
---- FRAGMENTO 8 ---
-n servicio puede tener muchos pedidos.
-Un servicio pertenece a una categoría.
-Un pedido pertenece a un usuario.
-Un pedido pertenece a un servicio.
-Una solicitud de depósito pertenece a un usuario.
-Una transacción pertenece a un usuario.
-Una transacción puede estar relacionada con otra entidad mediante una referencia polimórfica.
-Un registro de actividad puede estar relacionado con un usuario y con diferentes elementos del sistema mediante una relación polimórfica.
-El sistema permite registrar usuarios y verificar sus correos electrónicos.
-El sistema permite distinguir entre usuarios normales y administradores mediante el campo is_admin.
-El sistema permite manejar saldo de usuario mediante el campo balance.
-El sistema permite registrar servicios con precio, costo, categoría, imagen, horario, estado activo y formulario dinámico.
-El sistema permite que los usuarios realicen pedidos asociados a servicios.
-El sistema guarda los datos ingresados por el usuario en input_data.
-El sistema maneja estados de pedidos: pending, processing, completed y rejected.
-El sistema permite guardar archivos de resultado para pedidos completados mediante result_file_path.
-El sistema permite guardar notas
-
---- FRAGMENTO 9 ---
-hivos de resultado de pedidos mediante el disco s3.
-Tiene una integración básica de IA con Ollama usando el modelo llama3.2:1b mediante una ruta que consulta http://localhost:11434/api/generate.
-Según el código de web.php, la ruta /ia-test hace una consulta directa a Ollama. En ese archivo no se observa recuperación vectorial ni consulta RAG. Si el sistema usa RAG, esa lógica debe estar en otro archivo o script aparte.
-El sistema utiliza un seeder principal llamado DatabaseSeeder.
-DatabaseSeeder ejecuta dos seeders principales:
-- AdminSeeder
-- ServicesSeeder
-AdminSeeder se encarga de crear o actualizar el usuario administrador inicial del sistema.
-ServicesSeeder se encarga de crear o actualizar el catálogo inicial de servicios disponibles en el sistema.
-Esto permite preparar automáticamente la base de datos con un administrador inicial y una lista de servicios para que el sistema pueda funcionar desde el inicio.
-El sistema cuenta con un usuario administrador principal.
-Este administrador se crea automáticamente mediante AdminSeeder.
-El administrador tiene el campo is_admin activado como true, lo que permite identificarlo como usuario administrador dentro del sistema.
-El correo del
-
---- FRAGMENTO 10 ---
-eja estados de pedidos: pending, processing, completed y rejected.
-El sistema permite guardar archivos de resultado para pedidos completados mediante result_file_path.
-El sistema permite guardar notas administrativas en pedidos.
-El sistema permite registrar solicitudes de depósito con banco, clave de rastreo, monto, comprobante y estado.
-El sistema maneja estados de depósito: pending, approved y rejected.
-El sistema registra movimientos de saldo mediante transacciones de tipo deposit, purchase y refund.
-El sistema permite organizar servicios mediante categorías.
-El sistema permite registrar solicitudes de soporte, principalmente de tipo whatsapp.
-El sistema permite registrar actividad importante mediante activity_logs.
-El sistema incluye una integración básica de IA con Ollama mediante la ruta /ia-test.
-OrderResource es el recurso de Filament encargado de administrar los pedidos o trámites del sistema.
-El recurso usa el modelo Order.
-En la navegación de Filament, OrderResource aparece con el nombre Gestión de Trámites.
+--- FRAGMENTO 12 ---
+ce con el nombre Gestión de Trámites.
 El grupo de navegación de OrderResource es Operaciones.
 El formulario de OrderResource tiene una sección llamada Información del Pedido.
-En Información del Pedido
-
---- FRAGMENTO 11 ---
-stado.
-DepositRequestResource tiene una acción llamada Aprobar y Abonar.
-La acción Aprobar y Abonar solo es visible para administradores y solo cuando la solicitud está pending.
-La aprobación requiere confirmación.
-Al aprobar, el sistema usa una transacción de base de datos.
-El sistema bloquea el registro con lockForUpdate para evitar condiciones de carrera.
-Si la solicitud ya fue procesada antes, el sistema muestra una notificación de error y no la vuelve a procesar.
-Si sigue pendiente, el sistema cambia el estado a approved.
-El comentario del código indica que DepositRequestObserver se encarga de agregar el saldo y notificar al usuario cuando se aprueba el depósito.
-DepositRequestResource tiene una acción llamada Rechazar.
-La acción Rechazar solo es visible para administradores y solo cuando la solicitud está pending.
-Para rechazar, el administrador debe escribir un motivo.
-Al rechazar, el sistema cambia el estado a rejected y guarda el motivo en admin_notes.
-DepositRequestResource también tiene una acción ViewAction para ver la solicitud.
-La eliminación masiva solo es visible para administradores.
-Al eliminar solicitudes en masa, el sistema no elimina solicitudes
-
---- FRAGMENTO 12 ---
-e creación.
-El sistema usa la tabla sessions para guardar información de sesiones activas, como id de sesión, usuario relacionado, dirección IP, navegador o dispositivo usado, datos de sesión y última actividad.
-El modelo User usa autenticación de Laravel y notificaciones.
-El usuario debe verificar su correo electrónico porque el modelo User implementa MustVerifyEmail.
-El sistema usa notificaciones personalizadas para enviar correos de verificación y recuperación de contraseña.
-El modelo User tiene campos como name, email, password, balance, is_admin, company_name, phone, account_type, is_verified_company y email_verified_at.
-El campo password está oculto para serialización, junto con remember_token.
-El campo email_verified_at se convierte a tipo datetime.
-El campo password se maneja como hashed.
-El campo is_admin se maneja como booleano.
-El sistema maneja usuarios normales y usuarios administradores.
-La tabla users tiene un campo llamado is_admin.
-El campo is_admin indica si un usuario es administrador o no.
-Por defecto, is_admin es false. Esto significa que un usuario normal no es administrador.
-Cuando is_admin es true, el usuario puede ser tratado como administrador dentro del
+En Información del Pedido se selecciona el usuario mediante user_id.
+El campo user_id se relaciona con el modelo User y muestra el nombre del usuario.
+En Información del Pedido también se selecciona el servicio mediante service_id.
+El campo service_id se relaciona con el modelo Service y muestra el nombre del servicio.
+El campo service_id es reactivo. Cuando cambia el servicio seleccionado, el sistema limpia input_data para evitar que queden datos de un formulario anterior.
+OrderResource genera campos dinámicos de formulario usando el form_schema del servicio seleccionado.
+Si el servicio seleccionado no tiene form_schema, el sistema muestra un campo llamado input_data.text con la etiqueta Detalles adicionales.
+Si el servicio tiene form_schema, el sistema recorre cada campo definido y crea un TextInput dentro de input_data usando el name del campo.
+Cada campo dinámico usa la etiqueta label definida en form_schema.
+Si el campo dinámico está marcado como required, se vuelve obligatorio.
+Si el campo dinámico
 

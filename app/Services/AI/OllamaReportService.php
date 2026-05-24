@@ -16,7 +16,15 @@ class OllamaReportService
      */
     public function generateAdministrativeSummary(string $reportData): string
     {
-        $prompt = "Eres un asistente administrativo. Con base únicamente en los datos proporcionados a continuación, genera un resumen final de cierre de pedidos. No inventes información. Menciona cuántos pedidos se revisaron, cuántos se completaron, cuántos fueron procesados por API externa, cuántos fallaron y si hay pedidos en revisión manual. Usa lenguaje claro y profesional. Responde en español.\n\nDATOS DEL REPORTE:\n" . $reportData;
+        $prompt = "Eres un asistente administrativo. Genera un resumen de cierre basado ESTRICTAMENTE en los datos a continuación. Cumple estas reglas obligatorias:\n"
+            . "1. No inventes pedidos, errores ni revisiones manuales.\n"
+            . "2. Si 'Fallidos por API' es 0, indica claramente que no hubo fallos.\n"
+            . "3. Si 'Revisión manual' es 0, indica claramente que no hay pedidos en revisión manual.\n"
+            . "4. Si un dato no aparece, no lo menciones.\n"
+            . "5. No des recomendaciones que contradigan los números.\n"
+            . "6. Limita tu respuesta a máximo 2 párrafos cortos o una lista puntual.\n"
+            . "Responde en español y con lenguaje profesional.\n\n"
+            . "DATOS DEL REPORTE:\n" . $reportData;
 
         try {
             Log::info('[OllamaReportService] Solicitando resumen a Ollama (llama3.2:1b)...');
