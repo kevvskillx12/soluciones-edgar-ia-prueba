@@ -33,14 +33,21 @@ Route::get('/app/orders/{order}/download', function (\App\Models\Order $order) {
         abort(403);
     }
 
-    if (!$order->result_file_path) {
-        abort(404);
+    $path = $order->result_file_path;
+
+    if (!$path) {
+        abort(404, 'El pedido no tiene archivo de resultado.');
     }
 
-    return \Illuminate\Support\Facades\Storage::disk('s3')->download(
-        $order->result_file_path,
-        'Resultado_' . $order->id . '.pdf'
-    );
+    if (\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+        return \Illuminate\Support\Facades\Storage::disk('public')->download($path, basename($path));
+    }
+
+    if (\Illuminate\Support\Facades\Storage::disk('s3')->exists($path)) {
+        return \Illuminate\Support\Facades\Storage::disk('s3')->download($path, basename($path));
+    }
+
+    abort(404, 'Archivo de resultado no encontrado.');
 })->middleware(['auth'])->name('orders.download');
 
 require __DIR__ . '/auth.php';

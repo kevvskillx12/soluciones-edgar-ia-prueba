@@ -2,7 +2,9 @@
 
 namespace App\Observers;
 
+use App\Jobs\ProcessExternalOrderJob;
 use App\Models\Order;
+use Illuminate\Support\Facades\Log;
 
 class OrderObserver
 {
@@ -64,6 +66,19 @@ class OrderObserver
         $admins = \App\Models\User::where('is_admin', true)->get();
         foreach ($admins as $admin) {
             \Illuminate\Support\Facades\Mail::to($admin->email)->send(new \App\Mail\AdminOrderCreated($order));
+        }
+
+        // Despachar procesamiento automático por API externa si aplica
+        try {
+            $service = $order->service;
+            if ($service && $service->automation_type === 'automatic') {
+                Log::info("[OrderObserver] Order #{$order->id} con servicio automático. Despachando ProcessExternalOrderJob.");
+                $order->updateQuietly(['api_status' => 'queued']);
+                ProcessExternalOrderJob::dispatch($order);
+            }
+        } catch (\Throwable $e) {
+            // No bloquear la creación del pedido si el despacho del Job falla
+            Log::error("[OrderObserver] Error al despachar Job para Order #{$order->id}: " . $e->getMessage());
         }
     }
 

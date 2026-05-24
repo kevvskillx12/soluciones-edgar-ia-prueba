@@ -210,31 +210,27 @@ class ServiceResource extends Resource
                     Tables\Columns\TextColumn::make('automation_type')
                         ->label('Automatización')
                         ->badge()
-                        ->color(fn (string $state): string => match ($state) {
-                            'manual' => 'gray',
-                            'semi_automatic' => 'warning',
-                            'automatic' => 'success',
-                            default => 'gray',
-                        })
-                        ->formatStateUsing(fn (string $state): string => match ($state) {
-                            'manual' => 'Manual',
-                            'semi_automatic' => 'Semi automático',
+                        ->formatStateUsing(fn (?string $state): string => match ($state) {
                             'automatic' => 'Automático',
-                            default => $state,
+                            'semi_automatic' => 'Semi automático',
+                            'manual' => 'Manual',
+                            default => 'Manual',
                         })
-                        ->icon(fn (string $state): string => match ($state) {
-                            'automatic' => 'heroicon-m-bolt',
-                            'semi_automatic' => 'heroicon-m-adjustments-horizontal',
-                            default => 'heroicon-m-hand-raised',
+                        ->color(fn (?string $state): string => match ($state) {
+                            'automatic' => 'success',
+                            'semi_automatic' => 'warning',
+                            'manual' => 'gray',
+                            default => 'gray',
                         }),
 
                     Tables\Columns\TextColumn::make('external_provider')
                         ->label('Proveedor')
                         ->badge()
-                        ->color('info')
-                        ->placeholder('—')
-                        ->formatStateUsing(fn (?string $state): string => $state ? strtoupper($state) : '—')
-                        ->visible(fn (?string $state): bool => !empty($state)),
+                        ->placeholder('Sin proveedor'),
+
+                    Tables\Columns\TextColumn::make('external_service_id')
+                        ->label('ID externo')
+                        ->placeholder('Sin ID'),
 
                     Tables\Columns\TextColumn::make('pending')
                          ->counts('orders', fn (Builder $query) => $query->whereIn('status', ['pending', 'processing']))
