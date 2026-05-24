@@ -54,8 +54,8 @@ Route::post('/ia-test', function () {
 
         $pregunta = request('pregunta', 'Hola');
 
-        $pythonPath = 'C:\\Users\\Kevin\\AppData\\Local\\Python\\bin\\python.exe';
-        $scriptPath = 'C:\\Users\\Kevin\\Documents\\soluciones-edgar\\rag\\rag_bridge.py';
+        $pythonPath = base_path('rag/venv/bin/python');
+        $scriptPath = base_path('rag/rag_bridge.py');
 
         if (!file_exists($pythonPath)) {
             return response()->json([
@@ -71,7 +71,7 @@ Route::post('/ia-test', function () {
 
         $preguntaEsc = escapeshellarg($pregunta);
 
-        $command = 'set PYTHONIOENCODING=utf-8 && "' . $pythonPath . '" "' . $scriptPath . '" ' . $preguntaEsc . ' 2>&1';
+        $command = 'PYTHONIOENCODING=utf-8 "' . $pythonPath . '" "' . $scriptPath . '" ' . $preguntaEsc . ' 2>&1';
 
         $output = shell_exec($command);
 

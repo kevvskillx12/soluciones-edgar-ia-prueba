@@ -22,3 +22,14 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+rag/venv/
+rag/chroma_db/
+venv/
+.env
+__pycache__/
+*.pyc
+rag/chroma_db/
+/vendor/
+/node_modules/
+public/build/
+storage/*.key
