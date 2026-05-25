@@ -1,207 +1,189 @@
-PREGUNTA: cómo se procesan los pedidos
+PREGUNTA: por qué está justificado el uso de IA
 
 --- FRAGMENTO 1 ---
-Soluciones Edgar es una plataforma web de gestión de trámites y servicios digitales. El sistema permite a los usuarios solicitar, rastrear y recibir resultados de trámites a través de internet.
-El sistema está desarrollado con Laravel y PHP. Usa Eloquent ORM para manejar modelos como User, Service y Order. Usa migrations para crear y modificar tablas de base de datos, seeders para cargar datos iniciales y Filament para manejar paneles del sistema.
-El sistema maneja usuarios, administradores, servicios, pedidos, saldo de usuario, depósitos, transacciones, categorías, solicitudes de soporte, registros de actividad y una integración básica de inteligencia artificial con Ollama.
-Los clientes pueden registrarse, verificar su correo, consultar servicios, realizar pedidos, revisar el estado de sus trámites, administrar su saldo y descargar resultados cuando el pedido está completado.
-Los administradores pueden acceder al panel administrativo, gestionar usuarios, servicios, pedidos, solicitudes de depósito y otros módulos del sistema.
-El sistema Soluciones Edgar está construido con Laravel y PHP.
-Usa Eloquent ORM para manejar modelos y relaciones de base de datos.
-Usa migrations de
+IMPORTANTE PARA EL RAG:
+Este documento está organizado por preguntas frecuentes y secciones cortas.
+Cada bloque intenta ser independiente para que ChromaDB pueda recuperar la respuesta completa aunque solo encuentre un fragmento.
+No incluir contraseñas, tokens, credenciales reales ni datos sensibles.
+Soluciones Edgar es una plataforma web para gestionar trámites y servicios digitales. El sistema permite que los usuarios se registren, consulten servicios, soliciten trámites, paguen con saldo interno, revisen el estado de sus pedidos y descarguen resultados cuando el trámite está completado.
+El sistema tiene un panel administrativo construido con Filament. Desde ese panel el administrador puede gestionar usuarios, servicios, pedidos, solicitudes de depósito, transacciones, reportes y el chat administrativo con IA local.
+El sistema maneja usuarios, administradores, servicios, pedidos, saldo, depósitos, transacciones, categorías, soporte, actividad del sistema, automatización por API externa, reportes de cierre e integración de IA local.
+Soluciones Edgar usa Laravel y PHP como base del backend.
+El proyecto usa Eloquent ORM para manejar modelos y relaciones de base de datos.
+Usa
 
 --- FRAGMENTO 2 ---
-PDF de pedidos y al hacerlo cambia el pedido a completed.
-La descarga de PDF solo se muestra cuando el pedido está completed y tiene result_file_path.
-El sistema de depósitos tiene monto mínimo de 300 pesos según DepositRequestResource.
-Las solicitudes de depósito aprobadas no se eliminan en eliminación masiva.
-Los clientes no administradores solo ven sus propias solicitudes de depósito.
-Los administradores pueden ver todas las solicitudes de depósito.
-La aprobación de depósitos cambia el estado a approved y el saldo se agrega mediante DepositRequestObserver, según el comentario del código.
-La lógica del observer debe revisarse en el archivo correspondiente para confirmar exactamente cómo se abona el saldo y cómo se notifica al usuario.
-El sistema usa Laravel, PHP, Eloquent ORM, migrations, seeders, Filament, Livewire Volt, notificaciones de Laravel, almacenamiento compatible con S3 y Ollama con el modelo llama3.2:1b para la integración básica de IA.
-El sistema ofrece servicios de actas, SAT, IMSS, servicios generales, Infonavit y vehículos.
-Los estados de un pedido son pending, processing, completed y rejected.
-Pending significa que el pedido está pendiente.
-Processing significa
+citud está pendiente de revisión.
+approved significa que el depósito fue aprobado y el saldo puede agregarse al usuario.
+rejected significa que el depósito fue rechazado.
+Pregunta frecuente: ¿Qué hace DepositRequestResource?
+DepositRequestResource es el recurso de Filament que administra las solicitudes de depósito. Permite listar, crear, editar y eliminar solicitudes. Cada solicitud guarda usuario, banco, clave de rastreo, monto, comprobante, estado y notas administrativas. Los estados de depósito son pending, approved y rejected.
+Los servicios se guardan en la tabla services.
+Cada servicio puede tener código, nombre, descripción, precio, costo, tipo de servicio, categoría, imagen, horario activo, tiempo de procesamiento, estado activo y formulario dinámico.
+El campo price indica el precio que paga el usuario.
+El campo cost indica el costo interno del servicio.
+El campo is_active indica si el servicio está activo.
+El campo category_id relaciona el servicio con una categoría.
+El campo form_schema guarda la estructura JSON del formulario dinámico que debe llenar el usuario.
+Un servicio puede tener muchos pedidos.
+Un servicio pertenece a una categoría.
+Pregunta frecuente: ¿Qué
 
 --- FRAGMENTO 3 ---
-ard.pages.buy-service con el id del servicio.
-La acción SOLICITAR solo es visible si el servicio está activo.
-ServiceResource también tiene acción de editar.
-ServiceResource permite eliminación masiva mediante DeleteBulkAction.
-Las páginas de ServiceResource son index, create y edit.
-DepositRequestResource es el recurso de Filament encargado de administrar solicitudes de saldo o depósitos.
-El recurso usa el modelo DepositRequest.
-En la navegación de Filament aparece como Solicitudes de Saldo.
-El grupo de navegación es Finanzas.
-El formulario de DepositRequestResource tiene una sección llamada Instrucciones de Depósito.
-Esta sección muestra instrucciones de transferencia y una imagen de pago ubicada en images/pays.jpeg.
-La sección indica que el monto mínimo es de 300 pesos MXN.
-También indica que un envío menor puede causar pérdida de saldo y que solo se aceptan transferencias electrónicas.
-El formulario tiene una sección llamada Detalles de la Transferencia.
-El campo user_id se asigna automáticamente con el id del usuario autenticado.
-El campo bank_name guarda el banco emisor.
-El campo tracking_key guarda la clave de rastreo o referencia.
-El tracking_key es obligatorio y único.
-El
+PI externa, reportes de cierre e integración de IA local.
+Soluciones Edgar usa Laravel y PHP como base del backend.
+El proyecto usa Eloquent ORM para manejar modelos y relaciones de base de datos.
+Usa migrations de Laravel para crear y modificar tablas.
+Usa seeders para cargar datos iniciales como el usuario administrador y el catálogo de servicios.
+Usa Filament v3 para construir el panel administrativo y los recursos de gestión.
+Usa Livewire Volt para páginas de autenticación como login, registro, recuperación de contraseña, confirmación de contraseña y verificación de correo.
+Usa el sistema de notificaciones de Laravel para enviar correos de verificación y recuperación de contraseña.
+Usa almacenamiento local público y almacenamiento compatible con S3 para guardar y descargar archivos de resultado.
+Usa Python para el sistema RAG.
+Usa ChromaDB como base de datos vectorial.
+Usa el modelo de embeddings all-MiniLM-L6-v2 para convertir fragmentos de texto en vectores.
+Usa Ollama de forma local con el modelo llama3.2:1b para generar respuestas.
+Usa la ruta /ia-test para conectar el chat del sistema con comandos administrativos, RAG y Ollama.
+Pregunta frecuente: ¿Qué tecnologías usa el
 
 --- FRAGMENTO 4 ---
-eja estados de pedidos: pending, processing, completed y rejected.
-El sistema permite guardar archivos de resultado para pedidos completados mediante result_file_path.
-El sistema permite guardar notas administrativas en pedidos.
-El sistema permite registrar solicitudes de depósito con banco, clave de rastreo, monto, comprobante y estado.
-El sistema maneja estados de depósito: pending, approved y rejected.
-El sistema registra movimientos de saldo mediante transacciones de tipo deposit, purchase y refund.
-El sistema permite organizar servicios mediante categorías.
-El sistema permite registrar solicitudes de soporte, principalmente de tipo whatsapp.
-El sistema permite registrar actividad importante mediante activity_logs.
-El sistema incluye una integración básica de IA con Ollama mediante la ruta /ia-test.
-OrderResource es el recurso de Filament encargado de administrar los pedidos o trámites del sistema.
-El recurso usa el modelo Order.
-En la navegación de Filament, OrderResource aparece con el nombre Gestión de Trámites.
-El grupo de navegación de OrderResource es Operaciones.
-El formulario de OrderResource tiene una sección llamada Información del Pedido.
-En Información del Pedido
+n final generado con Ollama o con PHP si Ollama no está disponible.
+La IA no se usa solo para buscar información que ya aparece en pantalla.
+La IA se usa como asistente administrativo para explicar el sistema, recuperar información técnica del proyecto, analizar pedidos, redactar reportes de cierre y generar resúmenes administrativos.
+La automatización por API externa se encarga del procesamiento automático de trámites cuando el servicio lo permite.
+Ollama ayuda a redactar reportes y conclusiones sin depender de servicios externos de IA.
+El RAG ayuda a que las respuestas se basen en información documentada del proyecto.
+La combinación de API externa, reportes e IA local permite reducir trabajo manual, mejorar trazabilidad y dejar evidencia del proceso.
+Pregunta frecuente: ¿Está justificado el uso de IA en Soluciones Edgar?
+Sí. La IA está justificada porque apoya al administrador con explicaciones del sistema, búsqueda contextual en la base de conocimiento, análisis de pedidos, generación de reportes y resúmenes administrativos. La automatización real de trámites se maneja con API externa, mientras que la IA ayuda a interpretar, resumir y documentar el proceso.
+1. El usuario inicia
 
 --- FRAGMENTO 5 ---
-licitudes de depósito y otros módulos del sistema.
-El sistema Soluciones Edgar está construido con Laravel y PHP.
-Usa Eloquent ORM para manejar modelos y relaciones de base de datos.
-Usa migrations de Laravel para crear y modificar tablas.
-Usa seeders de Laravel para cargar datos iniciales, como el administrador inicial y el catálogo de servicios.
-Usa Filament para construir paneles de administración y recursos de gestión.
-Usa Livewire Volt para las páginas de autenticación como registro, login, recuperación de contraseña, confirmación de contraseña y verificación de correo.
-Usa el sistema de notificaciones de Laravel para enviar correos de verificación y recuperación de contraseña.
-Usa relaciones de Eloquent como hasMany y belongsTo para conectar usuarios, servicios, pedidos, depósitos, transacciones y categorías.
-Usa relaciones polimórficas para conectar transacciones y registros de actividad con diferentes modelos del sistema.
-Usa almacenamiento compatible con S3 para descargar archivos de resultado de pedidos mediante el disco s3.
-Tiene una integración básica de IA con Ollama usando el modelo llama3.2:1b mediante una ruta que consulta http://localhost:11434/api/generate.
-Según
+port y api_error_message.
+OrderResource tiene filtros para api_status y processed_by_api.
+OrderResource puede incluir acciones para procesar por API externa y acciones masivas para generar reportes de cierre.
+Pregunta frecuente: ¿Qué hace OrderResource?
+OrderResource administra los pedidos o trámites desde Filament. Permite crear, listar, editar y eliminar pedidos, seleccionar usuario y servicio, capturar datos dinámicos, revisar estado, subir resultado, ver información de API externa, filtrar pedidos y ejecutar acciones como procesar por API externa o generar reportes de cierre.
+ServiceResource es el recurso de Filament encargado de administrar servicios.
+Permite crear, listar, editar y eliminar servicios.
+Permite gestionar nombre, código, descripción, precio, costo, categoría, imagen, horario activo, tiempo de procesamiento, estado activo y form_schema.
+ServiceResource organiza servicios por pestañas de categoría.
+ServiceResource puede tener una sección de automatización por API externa.
+En la sección de automatización se configura automation_type, external_provider, external_service_id y api_handler.
+Los valores de automation_type pueden ser manual, semi_automatic y
 
 --- FRAGMENTO 6 ---
-ene una acción llamada Subir Resultado.
-La acción Subir Resultado permite subir un PDF, agregar notas y actualizar el pedido.
-Cuando se sube el resultado, el sistema guarda result_file_path, actualiza admin_notes si existen y cambia el estado del pedido a completed.
-Después de subir el resultado, Filament muestra una notificación de Trámite completado.
-La acción Subir Resultado solo aparece cuando el pedido todavía no está completed.
-La tabla de pedidos se ordena por created_at de forma descendente.
-Las páginas de OrderResource son index, create y edit.
-ServiceResource es el recurso de Filament encargado de administrar el catálogo de servicios.
-El recurso usa el modelo Service.
-En la navegación de Filament, ServiceResource aparece como Catálogo de Servicios.
-El grupo de navegación de ServiceResource es Operaciones.
-ServiceResource tiene prioridad de navegación antes que OrderResource porque su navigationSort es 1.
-El formulario de ServiceResource tiene una sección llamada Información Principal.
-En Información Principal se editan datos básicos como código, nombre, categoría, tipo legacy y descripción.
-El campo code representa el código único del servicio.
-El campo code es
+ece Soluciones Edgar
+- Cuales son los estados de un pedido
+- Como funciona el saldo del usuario
+- Que tecnologias usa el sistema
+- Que hace DepositRequestResource
+- Que hace ServiceResource
+- Que hace OrderResource
+- Como se procesan los pedidos
+- Genera un reporte de los últimos 5 trámites
+- Genera un reporte del último trámite
+- Reporte de cierre
+- Resume los pedidos fallidos
+- Qué quedó pendiente de revisión
+- Trámites en revisión manual
+- Resumen de trámites completados hoy
+- Cierre de hoy
+Pregunta frecuente: ¿Por qué el comando de reporte no depende del RAG?
+Porque un reporte de cierre debe usar datos reales y actuales de la base de datos, no solo texto del documento de conocimiento. Por eso AdminChatCommandService intercepta el mensaje, consulta los pedidos reales, genera el reporte y puede usar Ollama para redactar un resumen administrativo.
+El sistema puede generar reportes de cierre para pedidos procesados.
+El reporte puede crearse desde una acción masiva en OrderResource o desde el chat administrativo mediante comandos.
+El reporte se guarda como archivo .txt en storage/app/public/reports.
+El nombre del archivo puede tener el formato
 
 --- FRAGMENTO 7 ---
-equestResource también tiene una acción ViewAction para ver la solicitud.
-La eliminación masiva solo es visible para administradores.
-Al eliminar solicitudes en masa, el sistema no elimina solicitudes aprobadas.
-Solo se eliminan solicitudes pendientes o rechazadas.
-Si algunos registros no se eliminan porque ya estaban aprobados, el sistema muestra una notificación de advertencia.
-DepositRequestResource ordena las solicitudes por created_at de forma descendente.
-DepositRequestResource filtra la consulta según el tipo de usuario.
-Si el usuario no es administrador, solo ve sus propias solicitudes de depósito.
-Si el usuario es administrador, puede ver todas las solicitudes.
-Las páginas de DepositRequestResource son index, create y edit.
-UserResource es el recurso de Filament encargado de administrar usuarios.
-El recurso usa el modelo User.
-En la navegación de Filament aparece dentro del grupo Administración.
-El nombre del recurso es Usuario y el plural es Catálogo de Usuarios.
-El formulario de UserResource tiene una sección llamada Información Personal.
-En Información Personal se editan nombre, correo, contraseña, fecha de verificación y teléfono.
-El campo name es obligatorio.
-El
+el resumen final del reporte.
+Pregunta frecuente: ¿Cuál es el flujo completo de un trámite automático?
+El usuario solicita un servicio, el sistema crea el pedido, guarda input_data, valida y descuenta saldo, revisa si el servicio es automatic, despacha ProcessExternalOrderJob, procesa con ExternalOrderAutomationService, usa DhruApiService si el proveedor es dhru, genera o recibe el resultado, actualiza api_status, guarda api_report, marca processed_by_api y permite descargar el archivo desde el pedido.
+El proyecto ya tiene una IA local conectada al panel administrativo.
+El RAG funciona con ChromaDB y Ollama.
+El sistema puede responder preguntas sobre servicios, estados de pedidos, saldo, tecnologías, recursos de Filament y procesamiento de pedidos.
+El sistema tiene procesamiento por API externa en modo simulación.
+El sistema puede marcar pedidos como procesados por API externa.
+El sistema puede generar archivos de resultado simulados.
+El sistema puede generar reportes de cierre con resumen final usando Ollama.
+El sistema está preparado para conectar un proveedor real cuando se tengan credenciales, API activa y documentación oficial del proveedor.
+FIN DEL DOCUMENTO DE
 
 --- FRAGMENTO 8 ---
-tas, SAT, IMSS, servicios generales, Infonavit y vehículos.
-Los estados de un pedido son pending, processing, completed y rejected.
-Pending significa que el pedido está pendiente.
-Processing significa que el pedido está en proceso.
-Completed significa que el pedido fue completado.
-Rejected significa que el pedido fue rechazado.
-Un pedido guarda el usuario, servicio, datos ingresados, estado, archivo de resultado, notas administrativas, precio de compra, costo del servicio al momento de la compra y precio del servicio al momento de la compra.
-form_schema es el campo JSON de servicios que guarda la estructura del formulario dinámico que debe llenar el usuario.
-input_data es el campo de pedidos donde se guardan los datos que el usuario ingresó al solicitar un servicio.
-Un administrador se identifica mediante el campo is_admin en true.
-El saldo se guarda en el campo balance del usuario. El sistema puede incrementar saldo con credit o addBalance y descontarlo con subtractBalance.
-Si el usuario no es administrador y no tiene saldo suficiente, el sistema lanza el error Saldo insuficiente y no realiza el descuento.
-Los tipos de transacciones son deposit, purchase y refund.
-Los estados de
+/app/orders/{order}/download. El sistema valida permisos, revisa que exista result_file_path y descarga el archivo desde public o s3. Si el archivo no existe, devuelve 404.
+OrderResource es el recurso de Filament encargado de administrar pedidos o trámites.
+En Filament, OrderResource aparece como Gestión de Trámites.
+OrderResource permite listar, crear, editar y eliminar pedidos.
+El formulario permite seleccionar usuario y servicio.
+El formulario usa user_id para relacionar el pedido con User.
+El formulario usa service_id para relacionar el pedido con Service.
+El campo service_id puede ser reactivo y limpiar input_data al cambiar de servicio.
+OrderResource puede generar campos dinámicos usando el form_schema del servicio.
+OrderResource muestra información del pedido, estado, archivo de resultado y notas administrativas.
+OrderResource también muestra información de API externa como api_status, external_provider, external_order_id, api_processed_at, processed_by_api, api_report y api_error_message.
+OrderResource tiene filtros para api_status y processed_by_api.
+OrderResource puede incluir acciones para procesar por API externa y acciones masivas para generar reportes de
 
 --- FRAGMENTO 9 ---
-uario no es administrador y no tiene saldo suficiente, el sistema lanza el error Saldo insuficiente y no realiza el descuento.
-Los tipos de transacciones son deposit, purchase y refund.
-Los estados de una solicitud de depósito son pending, approved y rejected.
-price es el precio que paga el cliente. cost es el costo interno del servicio.
-Para conservar el precio original del servicio al momento de la compra, aunque después el precio cambie.
-Son copias del costo y precio del servicio al momento en que se creó el pedido.
-Los datos iniciales se cargan con DatabaseSeeder, que ejecuta AdminSeeder y ServicesSeeder.
-ServicesSeeder crea o actualiza el catálogo inicial de servicios del sistema.
-AdminSeeder crea o actualiza el usuario administrador inicial del sistema.
-DatabaseSeeder ejecuta los seeders principales para cargar datos iniciales del sistema.
-El sistema maneja categorías como Actas, SAT, IMSS, Servicios Generales, Infonavit y Vehículos.
-Un usuario puede tener muchos pedidos.
+campo form_schema guarda la estructura JSON del formulario dinámico que debe llenar el usuario.
 Un servicio puede tener muchos pedidos.
-Un pedido pertenece a un usuario y pertenece a un servicio.
-Guarda el usuario relacionado, si existe, el tipo de soporte y las fechas de creación y
+Un servicio pertenece a una categoría.
+Pregunta frecuente: ¿Qué servicios ofrece Soluciones Edgar?
+Soluciones Edgar ofrece servicios de actas, SAT, IMSS, servicios generales, Infonavit y trámites vehiculares. Entre los servicios registrados están acta de nacimiento, acta de defunción, acta de divorcio, acta de matrimonio, CSF con CURP, CSF con RFC e IDCIF, localizar IDCIF, constancia de vigencia de derechos NSS, localizar NSS, semanas cotizadas, localizar AFORE, CURP actualizada, recibo CFE, antecedentes no penales, servicios de Infonavit, formatos de pago de tenencia CDMX y EDOMEX, y hoja REPUVE.
+Pregunta frecuente: ¿Qué hace ServiceResource?
+ServiceResource es el recurso de Filament encargado de administrar el catálogo de servicios. Permite crear, listar, editar y eliminar servicios. También permite organizar servicios por categorías, manejar precios, costos, formularios dinámicos, imagen, estado activo y configuración de automatización por API externa.
+Las categorías se guardan en la tabla categories.
+Cada categoría tiene nombre, descripción y
 
 --- FRAGMENTO 10 ---
-n servicio puede tener muchos pedidos.
-Un servicio pertenece a una categoría.
-Un pedido pertenece a un usuario.
-Un pedido pertenece a un servicio.
-Una solicitud de depósito pertenece a un usuario.
-Una transacción pertenece a un usuario.
-Una transacción puede estar relacionada con otra entidad mediante una referencia polimórfica.
-Un registro de actividad puede estar relacionado con un usuario y con diferentes elementos del sistema mediante una relación polimórfica.
-El sistema permite registrar usuarios y verificar sus correos electrónicos.
-El sistema permite distinguir entre usuarios normales y administradores mediante el campo is_admin.
-El sistema permite manejar saldo de usuario mediante el campo balance.
-El sistema permite registrar servicios con precio, costo, categoría, imagen, horario, estado activo y formulario dinámico.
-El sistema permite que los usuarios realicen pedidos asociados a servicios.
-El sistema guarda los datos ingresados por el usuario en input_data.
-El sistema maneja estados de pedidos: pending, processing, completed y rejected.
-El sistema permite guardar archivos de resultado para pedidos completados mediante result_file_path.
-El sistema permite guardar notas
+una acción masiva en OrderResource o desde el chat administrativo mediante comandos.
+El reporte se guarda como archivo .txt en storage/app/public/reports.
+El nombre del archivo puede tener el formato reporte-cierre-pedidos-YYYYMMDD-HHMMSS.txt.
+El reporte incluye fecha, total de pedidos, completados, pendientes, en proceso, rechazados, procesados por API externa, fallidos por API, revisión manual y proveedores usados.
+El reporte también incluye detalle de pedidos: pedido, servicio, usuario, estado, processed_by_api, api_status, proveedor, orden externa, reporte API y error.
+El resumen final puede generarse con Ollama local.
+Si Ollama no está disponible, el sistema puede generar un resumen básico con PHP.
+Pregunta frecuente: ¿Qué contiene el reporte de cierre?
+El reporte de cierre contiene resumen general de pedidos, cantidades por estado, pedidos procesados por API externa, fallos, revisión manual, proveedores utilizados, detalle de cada pedido, reportes API, errores y un resumen final generado con Ollama o con PHP si Ollama no está disponible.
+La IA no se usa solo para buscar información que ya aparece en pantalla.
+La IA se usa como asistente administrativo para explicar el
 
 --- FRAGMENTO 11 ---
-s pedidos mediante la relación orders.
-Un servicio pertenece a una categoría mediante la relación category.
-El seeder ServicesSeeder crea o actualiza el catálogo inicial de servicios disponibles en el sistema.
-Cada servicio registrado por el seeder tiene código, nombre, descripción, precio, tipo de servicio, tiempo de procesamiento y formulario requerido.
-El seeder también asigna imágenes a los servicios mediante un mapeo manual de códigos de servicio con archivos de imagen.
-Cada servicio se registra como activo.
-El seeder calcula el costo interno del servicio. Si no existe un costo definido, usa el 70% del precio como costo aproximado.
-Los servicios se crean o actualizan usando updateOrCreate con el código del servicio. Esto evita duplicar servicios cuando el seeder se ejecuta varias veces.
-El sistema maneja varias categorías o tipos de servicios:
-- ACTAS
-- SAT
-- SINDOS IMSS
-- SERVICIOS
-- INFONAVIT
-- VEHICULOS
-El sistema también migra los tipos antiguos de servicio hacia categorías nuevas.
-El tipo ACTAS se convierte en la categoría Actas, con descripción de servicios de actas civiles.
-El tipo SAT se convierte en la categoría SAT, relacionada con trámites de Hacienda y Crédito
+stra las solicitudes de depósito. Permite al administrador revisar banco, clave de rastreo, monto, comprobante, estado y notas. Los estados son pending, approved y rejected.
+UserResource o ManageUsers permite administrar usuarios desde Filament.
+Permite manejar registros de usuarios.
+Puede incluir una acción para crear usuarios.
+El sistema usa is_admin para identificar administradores.
+El sistema usa balance para manejar saldo de usuario.
+Pregunta frecuente: ¿Qué hace UserResource?
+UserResource permite administrar usuarios en Filament. Permite revisar o crear usuarios y manejar información importante como nombre, correo, saldo y rol de administrador.
+La tabla support_requests guarda solicitudes de soporte.
+Una solicitud de soporte puede pertenecer a un usuario.
+El campo type puede tener valores como whatsapp.
+La tabla activity_logs guarda eventos del sistema.
+activity_logs puede guardar user_id, event, subject_type, subject_id, description, properties, ip_address y timestamps.
+Los registros de actividad sirven para dejar evidencia de acciones importantes.
+Pregunta frecuente: ¿Qué guarda activity_logs?
+activity_logs guarda eventos importantes del sistema, usuario relacionado,
 
 --- FRAGMENTO 12 ---
-ce con el nombre Gestión de Trámites.
-El grupo de navegación de OrderResource es Operaciones.
-El formulario de OrderResource tiene una sección llamada Información del Pedido.
-En Información del Pedido se selecciona el usuario mediante user_id.
-El campo user_id se relaciona con el modelo User y muestra el nombre del usuario.
-En Información del Pedido también se selecciona el servicio mediante service_id.
-El campo service_id se relaciona con el modelo Service y muestra el nombre del servicio.
-El campo service_id es reactivo. Cuando cambia el servicio seleccionado, el sistema limpia input_data para evitar que queden datos de un formulario anterior.
-OrderResource genera campos dinámicos de formulario usando el form_schema del servicio seleccionado.
-Si el servicio seleccionado no tiene form_schema, el sistema muestra un campo llamado input_data.text con la etiqueta Detalles adicionales.
-Si el servicio tiene form_schema, el sistema recorre cada campo definido y crea un TextInput dentro de input_data usando el name del campo.
-Cada campo dinámico usa la etiqueta label definida en form_schema.
-Si el campo dinámico está marcado como required, se vuelve obligatorio.
-Si el campo dinámico
+ión de reportes y resúmenes administrativos. La automatización real de trámites se maneja con API externa, mientras que la IA ayuda a interpretar, resumir y documentar el proceso.
+1. El usuario inicia sesión.
+2. El usuario consulta los servicios disponibles.
+3. El usuario solicita un trámite.
+4. El sistema guarda el pedido con usuario, servicio e input_data.
+5. El sistema valida saldo.
+6. Si hay saldo suficiente, descuenta el saldo y registra una transacción purchase.
+7. Si el servicio es manual, queda para revisión del administrador.
+8. Si el servicio es automático, se despacha ProcessExternalOrderJob.
+9. El Job usa ExternalOrderAutomationService.
+10. Si el proveedor es dhru, se usa DhruApiService.
+11. En simulación se genera una orden SIM y un archivo de resultado.
+12. El pedido se marca como completed y processed_by_api si terminó correctamente.
+13. El usuario o administrador descarga el resultado.
+14. El administrador puede generar un reporte de cierre.
+15. Ollama puede redactar el resumen final del reporte.
+Pregunta frecuente: ¿Cuál es el flujo completo de un trámite automático?
+El usuario solicita un servicio, el sistema crea el pedido, guarda input_data, valida y descuenta
 

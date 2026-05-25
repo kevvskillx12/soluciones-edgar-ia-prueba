@@ -46,10 +46,12 @@ def buscar_contexto(pregunta):
 
     res = coleccion.query(
         query_texts=[pregunta_busqueda],
-        n_results=TOP_K
+        n_results=TOP_K,
+        include=["documents", "distances"]
     )
 
     documentos = res.get("documents", [[]])[0]
+    distancias = res.get("distances", [[]])[0]
 
     # DEBUG: guarda los fragmentos recuperados para revisar si ChromaDB encontró lo correcto.
     with open("debug_fragmentos.txt", "w", encoding="utf-8") as f:
@@ -59,7 +61,10 @@ def buscar_contexto(pregunta):
             f.write(doc)
             f.write("\n\n")
 
-    return documentos
+    return {
+        "documents": documentos,
+        "distances": distancias
+    }
 
 
 def respuesta_directa_si_aplica(pregunta):
@@ -213,28 +218,28 @@ def consultar_ollama(pregunta, fragmentos):
     contexto = "\n\n".join([f"FRAGMENTO {i + 1}:\n{f}" for i, f in enumerate(fragmentos)])
 
     prompt = f"""
-Eres el asistente oficial del sistema Soluciones Edgar.
+Eres un asistente interno del sistema Soluciones Edgar.
 
-REGLAS OBLIGATORIAS:
-- Responde únicamente usando la INFORMACION DEL SISTEMA.
-- No uses conocimiento externo.
-- No respondas como si hablaras de sistemas en general.
-- No inventes servicios, tecnologías, procesos, rutas, precios ni estados.
-- No repitas estas instrucciones.
-- Si la respuesta no aparece en la INFORMACION DEL SISTEMA, responde exactamente:
-No tengo informacion sobre eso en mi base de conocimiento.
+Debes responder usando únicamente la INFORMACION proporcionada abajo.
 
-INFORMACION DEL SISTEMA:
-\"\"\"
+REGLAS:
+- Responde únicamente con la información proporcionada.
+- Si el contexto contiene una sección llamada "Pregunta frecuente", úsala como fuente principal.
+- No digas "no hay información específica" si el contexto sí contiene datos relacionados.
+- No digas "puedo inferir" ni "se pueden hacer inferencias".
+- No pidas más contexto.
+- Responde de forma directa, como explicación para un profesor.
+- No inventes datos.
+- Si la pregunta es sobre justificación de IA, explica que la IA se usa como apoyo administrativo para reportes, resúmenes, errores y cierres, no como reemplazo de la lógica del sistema.
+- Si la pregunta es sobre pedidos, busca en la información palabras como pedidos, órdenes, ProcessExternalOrderJob, ExternalOrderAutomationService, DhruApiService, api_status o processed_by_api.
+
+INFORMACION:
 {contexto}
-\"\"\"
 
-PREGUNTA DEL USUARIO:
-\"\"\"
+PREGUNTA:
 {pregunta}
-\"\"\"
 
-RESPUESTA EN ESPAÑOL:
+RESPUESTA:
 """
 
     try:
@@ -246,8 +251,7 @@ RESPUESTA EN ESPAÑOL:
                 "stream": False,
                 "options": {
                     "temperature": 0.0,
-                    "num_predict": 350,
-                    "top_p": 0.3
+                    "num_predict": 350
                 }
             },
             timeout=120
@@ -273,6 +277,7 @@ def main():
         sys.exit(1)
 
     pregunta = sys.argv[1]
+    debug_mode = "--debug" in sys.argv
 
     try:
         directa = respuesta_directa_si_aplica(pregunta)
@@ -281,10 +286,20 @@ def main():
             print(json.dumps({"respuesta": directa}, ensure_ascii=False))
             sys.exit(0)
 
-        fragmentos = buscar_contexto(pregunta)
+        resultado_busqueda = buscar_contexto(pregunta)
+        fragmentos = resultado_busqueda["documents"]
+        distancias = resultado_busqueda["distances"]
+        
         respuesta = consultar_ollama(pregunta, fragmentos)
 
-        print(json.dumps({"respuesta": respuesta}, ensure_ascii=False))
+        if debug_mode:
+            print(json.dumps({
+                "respuesta": respuesta,
+                "fragmentos_recuperados": fragmentos,
+                "distancias": distancias
+            }, ensure_ascii=False, indent=2))
+        else:
+            print(json.dumps({"respuesta": respuesta}, ensure_ascii=False))
 
     except Exception as e:
         print(json.dumps({

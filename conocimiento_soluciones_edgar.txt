@@ -1,1474 +1,716 @@
 # BASE DE CONOCIMIENTO — SOLUCIONES EDGAR
-# Documento para sistema RAG
+# Documento optimizado para RAG
 # Proyecto: Soluciones Edgar
-# Versión: 3.0 — Mayo 2026
+# Versión: 4.0 — Mayo 2026
+
+IMPORTANTE PARA EL RAG:
+Este documento está organizado por preguntas frecuentes y secciones cortas.
+Cada bloque intenta ser independiente para que ChromaDB pueda recuperar la respuesta completa aunque solo encuentre un fragmento.
+No incluir contraseñas, tokens, credenciales reales ni datos sensibles.
 
 ---
 
-## INFORMACIÓN GENERAL DEL SISTEMA
+Pregunta frecuente: ¿Por qué está justificado el uso de IA en Soluciones Edgar?
 
-Soluciones Edgar es una plataforma web de gestión de trámites y servicios digitales. El sistema permite a los usuarios solicitar, rastrear y recibir resultados de trámites a través de internet.
+El uso de IA en Soluciones Edgar está justificado porque no se utiliza solamente como un buscador de información. La IA se usa como apoyo administrativo para analizar información de pedidos reales, redactar reportes de cierre, resumir errores, explicar estados de trámites y generar conclusiones útiles para el administrador.
 
-El sistema está desarrollado con Laravel y PHP. Usa Eloquent ORM para manejar modelos como User, Service y Order. Usa migrations para crear y modificar tablas de base de datos, seeders para cargar datos iniciales y Filament para manejar paneles del sistema.
+El sistema no depende de la IA para hacer operaciones críticas como crear pedidos, descontar saldo, consultar la base de datos, cambiar estados o procesar servicios por API externa. Esas tareas las realiza Laravel mediante lógica normal del sistema.
 
-El sistema maneja usuarios, administradores, servicios, pedidos, saldo de usuario, depósitos, transacciones, categorías, solicitudes de soporte, registros de actividad y una integración básica de inteligencia artificial con Ollama.
+La IA se usa donde aporta más valor: convertir datos técnicos y operativos en explicaciones claras. Por ejemplo, cuando el administrador pide un reporte de los últimos trámites, Laravel consulta la base de datos real, calcula los totales, identifica pedidos completados, fallidos, pendientes o procesados por API externa, y después Ollama redacta un resumen administrativo.
 
-Los clientes pueden registrarse, verificar su correo, consultar servicios, realizar pedidos, revisar el estado de sus trámites, administrar su saldo y descargar resultados cuando el pedido está completado.
+Esto evita que el administrador tenga que revisar pedido por pedido y escribir manualmente un cierre del día. También ayuda a detectar errores, revisar trámites pendientes y explicar el funcionamiento interno del sistema.
 
-Los administradores pueden acceder al panel administrativo, gestionar usuarios, servicios, pedidos, solicitudes de depósito y otros módulos del sistema.
+El uso de IA local con Ollama también está justificado porque permite trabajar sin depender de servicios externos de IA, protege mejor la información del sistema y reduce costos por consumo de tokens en la nube.
+
+En resumen, la IA en Soluciones Edgar está justificada porque funciona como asistente administrativo local. No reemplaza la lógica del sistema, sino que ayuda a resumir, explicar y documentar información real de los trámites.
 
 ---
 
-## TECNOLOGÍAS DEL SISTEMA
+## 1. RESUMEN GENERAL DEL SISTEMA
 
-El sistema Soluciones Edgar está construido con Laravel y PHP.
+Soluciones Edgar es una plataforma web para gestionar trámites y servicios digitales. El sistema permite que los usuarios se registren, consulten servicios, soliciten trámites, paguen con saldo interno, revisen el estado de sus pedidos y descarguen resultados cuando el trámite está completado.
 
-Usa Eloquent ORM para manejar modelos y relaciones de base de datos.
+El sistema tiene un panel administrativo construido con Filament. Desde ese panel el administrador puede gestionar usuarios, servicios, pedidos, solicitudes de depósito, transacciones, reportes y el chat administrativo con IA local.
+
+El sistema maneja usuarios, administradores, servicios, pedidos, saldo, depósitos, transacciones, categorías, soporte, actividad del sistema, automatización por API externa, reportes de cierre e integración de IA local.
+
+---
+
+## 2. TECNOLOGÍAS DEL SISTEMA
+
+Soluciones Edgar usa Laravel y PHP como base del backend.
+
+El proyecto usa Eloquent ORM para manejar modelos y relaciones de base de datos.
 
 Usa migrations de Laravel para crear y modificar tablas.
 
-Usa seeders de Laravel para cargar datos iniciales, como el administrador inicial y el catálogo de servicios.
+Usa seeders para cargar datos iniciales como el usuario administrador y el catálogo de servicios.
 
-Usa Filament para construir paneles de administración y recursos de gestión.
+Usa Filament v3 para construir el panel administrativo y los recursos de gestión.
 
-Usa Livewire Volt para las páginas de autenticación como registro, login, recuperación de contraseña, confirmación de contraseña y verificación de correo.
+Usa Livewire Volt para páginas de autenticación como login, registro, recuperación de contraseña, confirmación de contraseña y verificación de correo.
 
 Usa el sistema de notificaciones de Laravel para enviar correos de verificación y recuperación de contraseña.
 
-Usa relaciones de Eloquent como hasMany y belongsTo para conectar usuarios, servicios, pedidos, depósitos, transacciones y categorías.
+Usa almacenamiento local público y almacenamiento compatible con S3 para guardar y descargar archivos de resultado.
 
-Usa relaciones polimórficas para conectar transacciones y registros de actividad con diferentes modelos del sistema.
+Usa Python para el sistema RAG.
 
-Usa almacenamiento compatible con S3 para descargar archivos de resultado de pedidos mediante el disco s3.
+Usa ChromaDB como base de datos vectorial.
 
-Tiene una integración básica de IA con Ollama usando el modelo llama3.2:1b mediante una ruta que consulta http://localhost:11434/api/generate.
+Usa el modelo de embeddings all-MiniLM-L6-v2 para convertir fragmentos de texto en vectores.
 
-Según el código de web.php, la ruta /ia-test hace una consulta directa a Ollama. En ese archivo no se observa recuperación vectorial ni consulta RAG. Si el sistema usa RAG, esa lógica debe estar en otro archivo o script aparte.
+Usa Ollama de forma local con el modelo llama3.2:1b para generar respuestas.
 
----
-
-## CARGA INICIAL DE DATOS
-
-El sistema utiliza un seeder principal llamado DatabaseSeeder.
-
-DatabaseSeeder ejecuta dos seeders principales:
-
-- AdminSeeder
-- ServicesSeeder
-
-AdminSeeder se encarga de crear o actualizar el usuario administrador inicial del sistema.
-
-ServicesSeeder se encarga de crear o actualizar el catálogo inicial de servicios disponibles en el sistema.
-
-Esto permite preparar automáticamente la base de datos con un administrador inicial y una lista de servicios para que el sistema pueda funcionar desde el inicio.
+Usa la ruta /ia-test para conectar el chat del sistema con comandos administrativos, RAG y Ollama.
 
 ---
 
-## ADMINISTRADOR INICIAL
+Pregunta frecuente: ¿Qué tecnologías usa el sistema?
 
-El sistema cuenta con un usuario administrador principal.
-
-Este administrador se crea automáticamente mediante AdminSeeder.
-
-El administrador tiene el campo is_admin activado como true, lo que permite identificarlo como usuario administrador dentro del sistema.
-
-El correo del administrador queda marcado como verificado automáticamente mediante email_verified_at.
-
-La contraseña del administrador se guarda usando Hash de Laravel, por lo que no se almacena directamente como texto plano en la base de datos.
-
-No se debe incluir la contraseña real del administrador dentro de la base de conocimiento del RAG.
+El sistema usa Laravel, PHP, Eloquent ORM, migrations, seeders, Filament v3, Livewire Volt, notificaciones de Laravel, almacenamiento local o S3, Python, ChromaDB, embeddings all-MiniLM-L6-v2, Ollama local y el modelo llama3.2:1b.
 
 ---
 
-## USUARIOS
+## 3. USUARIOS Y ADMINISTRADORES
 
-La tabla users guarda la información principal de los usuarios del sistema.
+La tabla users guarda la información principal de los usuarios.
 
-Cada usuario tiene id, nombre, correo electrónico, fecha de verificación del correo, contraseña, token de sesión recordada y fechas de creación y actualización.
+Cada usuario tiene nombre, correo, contraseña, saldo y datos adicionales como empresa, teléfono, tipo de cuenta y verificación de empresa.
 
-El correo electrónico de cada usuario debe ser único.
-
-El sistema usa la tabla password_reset_tokens para manejar recuperación de contraseña. Esta tabla guarda el correo del usuario, el token de recuperación y la fecha de creación.
-
-El sistema usa la tabla sessions para guardar información de sesiones activas, como id de sesión, usuario relacionado, dirección IP, navegador o dispositivo usado, datos de sesión y última actividad.
-
-El modelo User usa autenticación de Laravel y notificaciones.
-
-El usuario debe verificar su correo electrónico porque el modelo User implementa MustVerifyEmail.
-
-El sistema usa notificaciones personalizadas para enviar correos de verificación y recuperación de contraseña.
-
-El modelo User tiene campos como name, email, password, balance, is_admin, company_name, phone, account_type, is_verified_company y email_verified_at.
-
-El campo password está oculto para serialización, junto con remember_token.
-
-El campo email_verified_at se convierte a tipo datetime.
-
-El campo password se maneja como hashed.
-
-El campo is_admin se maneja como booleano.
-
----
-
-## ROLES Y ACCESO A PANELES
-
-El sistema maneja usuarios normales y usuarios administradores.
-
-La tabla users tiene un campo llamado is_admin.
-
-El campo is_admin indica si un usuario es administrador o no.
-
-Por defecto, is_admin es false. Esto significa que un usuario normal no es administrador.
-
-Cuando is_admin es true, el usuario puede ser tratado como administrador dentro del sistema.
-
-El modelo User controla el acceso a los paneles de Filament mediante el método canAccessPanel.
-
-Si el panel tiene id admin, solo pueden acceder los usuarios con is_admin en true.
-
-Para otros paneles, el acceso está permitido.
-
-La ruta principal / revisa si el usuario está autenticado. Si el usuario ya inició sesión y es administrador, lo redirige al panel /admin. Si el usuario ya inició sesión y no es administrador, lo redirige al panel /app. Si el usuario no ha iniciado sesión, lo redirige a /app/login.
-
-La ruta /login también redirige a /app/login.
-
----
-
-## AUTENTICACIÓN
-
-El sistema usa rutas de autenticación definidas en auth.php.
-
-Para usuarios invitados, el sistema tiene rutas de registro, inicio de sesión, recuperación de contraseña y restablecimiento de contraseña.
-
-Las rutas para usuarios invitados son:
-
-- register
-- login
-- forgot-password
-- reset-password/{token}
-
-Estas rutas usan Livewire Volt para mostrar las páginas de autenticación.
-
-Para usuarios autenticados, el sistema tiene rutas de verificación de correo y confirmación de contraseña.
-
-Las rutas autenticadas son:
-
-- verify-email
-- verify-email/{id}/{hash}
-- confirm-password
-
-La ruta verify-email/{id}/{hash} usa VerifyEmailController y cuenta con middleware signed y throttle.
-
-El middleware signed permite validar que el enlace de verificación sea legítimo.
-
-El middleware throttle limita la cantidad de intentos de verificación para evitar abuso.
-
----
-
-## SALDO DE USUARIO
-
-La tabla users tiene un campo llamado balance.
+El campo is_admin indica si un usuario es administrador.
 
 El campo balance guarda el saldo disponible del usuario.
 
-El saldo se guarda como decimal con formato de dinero, usando 10 dígitos en total y 2 decimales.
+El acceso al panel administrativo se controla con el método canAccessPanel del modelo User. Si el panel es admin, solo pueden entrar usuarios con is_admin en true.
 
-Por defecto, el saldo inicial del usuario es 0.
-
-El modelo User tiene métodos para agregar y descontar saldo.
-
-El método credit permite agregar saldo al usuario y registrar una transacción.
-
-Si la referencia del método credit es una solicitud de depósito, la transacción se registra como deposit.
-
-Si la referencia no es una solicitud de depósito, la transacción se registra como refund.
-
-El método addBalance permite agregar saldo indicando manualmente el tipo de transacción.
-
-El método subtractBalance descuenta saldo del usuario y registra una transacción de tipo purchase.
-
-Si el usuario no es administrador y no tiene saldo suficiente, subtractBalance detiene la operación y lanza el error: Saldo insuficiente.
-
-Las operaciones de saldo se realizan dentro de transacciones de base de datos para evitar errores o inconsistencias.
+Un usuario puede tener muchos pedidos, muchas solicitudes de depósito y muchas transacciones.
 
 ---
 
-## RELACIONES DEL USUARIO
+Pregunta frecuente: ¿Cómo se identifica un administrador?
 
-Un usuario puede tener muchos pedidos mediante la relación orders.
-
-Un usuario puede tener muchas solicitudes de depósito mediante la relación depositRequests.
-
-Un usuario puede tener muchas transacciones mediante la relación transactions.
+Un administrador se identifica con el campo is_admin en true dentro de la tabla users. El método canAccessPanel del modelo User revisa ese campo para permitir o negar acceso al panel admin de Filament.
 
 ---
 
-## DATOS DE EMPRESA
+## 4. SALDO, DEPÓSITOS Y TRANSACCIONES
 
-El sistema permite guardar información adicional de los usuarios relacionada con cuentas personales o cuentas de empresa.
+El saldo del usuario se guarda en el campo balance de la tabla users.
 
-La tabla users tiene campos adicionales:
+El saldo inicial de un usuario es 0.
 
-- company_name
-- phone
-- account_type
-- is_verified_company
+El sistema puede agregar saldo con los métodos credit o addBalance del modelo User.
 
-El campo company_name guarda el nombre de la empresa del usuario.
+El sistema puede descontar saldo con el método subtractBalance del modelo User.
 
-El campo phone guarda el teléfono del usuario.
+Cuando se agrega saldo, se registra una transacción de tipo deposit o refund, dependiendo del origen.
 
-El campo account_type indica el tipo de cuenta. Por defecto es personal.
+Cuando se descuenta saldo por una compra, se registra una transacción de tipo purchase.
 
-El campo account_type puede usarse para cuentas tipo personal o company.
+Si el usuario no es administrador y no tiene saldo suficiente, el sistema detiene la operación y muestra o lanza el error Saldo insuficiente.
 
-El campo is_verified_company indica si una cuenta de empresa está verificada.
+Las transacciones se guardan en la tabla transactions.
 
-Por defecto, is_verified_company es false.
+La tabla transactions tiene user_id, type, amount, reference_type, reference_id, description y timestamps.
 
----
-
-## SERVICIOS
-
-La tabla services guarda los servicios disponibles dentro del sistema.
-
-Cada servicio puede tener id, category_id, code, name, description, form_schema, price, cost, service_type, processing_time, active_schedule, image_path, is_active, created_at y updated_at.
-
-El campo name guarda el nombre del servicio.
-
-El campo description guarda la descripción o instrucciones del servicio.
-
-El campo price guarda el precio que paga el cliente.
-
-El campo cost guarda el costo interno del servicio para el sistema o negocio.
-
-El campo processing_time guarda el tiempo estimado de procesamiento.
-
-El campo active_schedule guarda el horario en el que el servicio está activo.
-
-El horario por defecto usado en servicios es 8:00 AM a 8:00 PM.
-
-El campo is_active indica si el servicio está activo.
-
-Por defecto, los servicios se crean como activos.
-
-El campo code guarda un código único para identificar cada servicio.
-
-El campo service_type guarda el tipo o categoría antigua del servicio. Este campo puede ser nulo.
-
-El campo image_path guarda la ruta de la imagen relacionada con el servicio.
-
-El campo category_id relaciona un servicio con una categoría de la tabla categories.
-
-Si una categoría se elimina, el campo category_id del servicio queda como nulo.
-
-El modelo Service representa los servicios disponibles en el sistema.
-
-El campo form_schema se convierte automáticamente a array.
-
-El campo is_active se maneja como booleano.
-
-El campo price se maneja como decimal con dos decimales.
-
-Un servicio puede tener muchos pedidos mediante la relación orders.
-
-Un servicio pertenece a una categoría mediante la relación category.
+Los tipos de transacción son deposit, purchase y refund.
 
 ---
 
-## CATÁLOGO INICIAL DE SERVICIOS
+Pregunta frecuente: ¿Cómo funciona el saldo del usuario?
 
-El seeder ServicesSeeder crea o actualiza el catálogo inicial de servicios disponibles en el sistema.
-
-Cada servicio registrado por el seeder tiene código, nombre, descripción, precio, tipo de servicio, tiempo de procesamiento y formulario requerido.
-
-El seeder también asigna imágenes a los servicios mediante un mapeo manual de códigos de servicio con archivos de imagen.
-
-Cada servicio se registra como activo.
-
-El seeder calcula el costo interno del servicio. Si no existe un costo definido, usa el 70% del precio como costo aproximado.
-
-Los servicios se crean o actualizan usando updateOrCreate con el código del servicio. Esto evita duplicar servicios cuando el seeder se ejecuta varias veces.
+El saldo del usuario se guarda en el campo balance de la tabla users. El sistema agrega saldo con credit o addBalance, y descuenta saldo con subtractBalance. Cuando se descuenta saldo se registra una transacción de tipo purchase. Si el usuario no es administrador y no tiene saldo suficiente, el sistema detiene la operación con el error Saldo insuficiente.
 
 ---
 
-## CATEGORÍAS PRINCIPALES DE SERVICIOS
+## 5. SOLICITUDES DE DEPÓSITO
 
-El sistema maneja varias categorías o tipos de servicios:
+Las solicitudes de depósito se guardan en la tabla deposit_requests.
 
-- ACTAS
-- SAT
-- SINDOS IMSS
-- SERVICIOS
-- INFONAVIT
-- VEHICULOS
+Cada solicitud de depósito pertenece a un usuario.
 
-El sistema también migra los tipos antiguos de servicio hacia categorías nuevas.
+Una solicitud de depósito guarda user_id, bank_name, tracking_key, amount, proof_image_path, status, admin_notes y timestamps.
 
-El tipo ACTAS se convierte en la categoría Actas, con descripción de servicios de actas civiles.
+tracking_key representa la clave de rastreo del depósito.
 
-El tipo SAT se convierte en la categoría SAT, relacionada con trámites de Hacienda y Crédito Público.
+proof_image_path guarda la ruta del comprobante de pago.
 
-El tipo SINDOS IMSS se convierte en la categoría IMSS, relacionada con servicios del IMSS.
-
-El tipo SERVICIOS se convierte en la categoría Servicios Generales.
-
-El tipo INFONAVIT se convierte en la categoría Infonavit.
-
-El tipo VEHICULOS se convierte en la categoría Vehículos.
-
-Si un servicio no tiene un tipo válido, se asigna a la categoría Servicios Generales.
-
----
-
-## SERVICIOS DE ACTAS
-
-Los servicios de ACTAS incluyen:
-
-- Acta de Nacimiento
-- Acta de Defunción
-- Acta de Divorcio
-- Acta de Matrimonio
-
-Estos servicios tienen precio de 70 pesos.
-
-Los servicios de actas requieren CURP.
-
-En acta de divorcio y acta de matrimonio se solicita la CURP de alguno de los esposos.
-
----
-
-## SERVICIOS SAT
-
-Los servicios SAT incluyen:
-
-- CSF Clon con CURP
-- CSF con RFC y IDCIF
-- Localizar IDCIF con RFC
-
-CSF Clon con CURP requiere CURP.
-
-CSF con RFC y IDCIF requiere RFC e IDCIF.
-
-Localizar IDCIF requiere RFC.
-
----
-
-## SERVICIOS SINDOS IMSS
-
-Los servicios relacionados con IMSS incluyen:
-
-- Constancia Vigencia Derechos NSS PDF por CURP
-- Localizar NSS con CURP
-- Semanas Cotizadas por CURP
-
-La constancia de vigencia de derechos requiere CURP.
-
-Localizar NSS con CURP requiere CURP.
-
-Semanas cotizadas requiere CURP y NSS en un mismo campo de entrada.
-
----
-
-## SERVICIOS GENERALES
-
-Los servicios generales incluyen:
-
-- Localizar AFORE
-- CURP Actualizada
-- Recibo CFE PDF
-- Antecedentes no Penales
-
-Localizar AFORE requiere CURP.
-
-CURP Actualizada requiere CURP.
-
-Recibo CFE PDF requiere número de servicio.
-
-Antecedentes no Penales requiere CURP, nombres, apellido paterno, apellido materno, domicilio y clave de elector.
-
----
-
-## SERVICIOS INFONAVIT
-
-Los servicios INFONAVIT incluyen:
-
-- Estado de Cuenta Mensual INFONAVIT
-- Recuperar Clave Cuenta INFONAVIT
-- Reporte Histórico INFONAVIT
-- Resumen Crédito INFONAVIT
-
-Estado de Cuenta Mensual INFONAVIT requiere número de crédito.
-
-Recuperar Clave Cuenta INFONAVIT requiere NSS.
-
-Reporte Histórico INFONAVIT requiere NSS.
-
-Resumen Crédito INFONAVIT requiere NSS o número de crédito.
-
----
-
-## SERVICIOS VEHICULARES
-
-Los servicios vehiculares incluyen:
-
-- Formato Pago de Tenencia CDMX
-- Formato Pago de Tenencia EDOMEX
-- Hoja REPUVE
-
-Formato Pago de Tenencia CDMX requiere número de placa y año a pagar.
-
-Formato Pago de Tenencia EDOMEX requiere número de placa.
-
-Hoja REPUVE requiere placa.
-
----
-
-## VALIDACIONES DE SERVICIOS
-
-El sistema usa validaciones para revisar que los datos ingresados tengan formato correcto.
-
-Algunos formularios validan CURP.
-
-Algunos formularios validan RFC.
-
-Algunos formularios validan NSS.
-
-Algunos formularios validan clave de elector.
-
-Algunos formularios validan placa vehicular.
-
----
-
-## FORMULARIOS DINÁMICOS
-
-El sistema usa formularios dinámicos para los servicios.
-
-La tabla services tiene un campo form_schema de tipo JSON.
-
-El campo form_schema guarda la estructura del formulario que debe llenar el usuario para cada servicio.
-
-Gracias a form_schema, cada servicio puede pedir datos diferentes.
-
-Por ejemplo, algunos servicios pueden pedir CURP, otros RFC, IDCIF, NSS, número de servicio, domicilio, clave de elector, número de crédito, placa o año de pago.
-
-La tabla orders tiene un campo input_data donde se guarda la información que el usuario ingresó al pedir un servicio.
-
-Originalmente input_data era un texto corto, pero después se cambió a tipo text para permitir guardar más información.
-
-El modelo Order convierte input_data automáticamente a array.
-
-Esto permite almacenar datos de formularios dinámicos más largos y estructurados.
-
----
-
-## PEDIDOS U ÓRDENES
-
-La tabla orders guarda los pedidos realizados por los usuarios.
-
-Cada pedido pertenece a un usuario mediante user_id.
-
-Cada pedido pertenece a un servicio mediante service_id.
-
-Si un usuario se elimina, sus pedidos también se eliminan porque user_id usa eliminación en cascada.
-
-Cada pedido guarda input_data, que contiene los datos ingresados por el usuario para solicitar el servicio.
-
-Cada pedido tiene un campo status que indica su estado actual.
-
-Los estados posibles de un pedido son:
-
-- pending
-- processing
-- completed
-- rejected
-
-pending significa que el pedido está pendiente.
-
-processing significa que el pedido está en proceso.
-
-completed significa que el pedido fue completado.
-
-rejected significa que el pedido fue rechazado.
-
-Por defecto, un pedido nuevo se crea con estado pending.
-
-La tabla orders también tiene result_file_path.
-
-El campo result_file_path puede guardar la ruta del archivo de resultado del pedido.
-
-El campo admin_notes permite guardar notas internas del administrador sobre el pedido.
-
-El modelo Order representa los pedidos realizados por los usuarios.
-
-Cada pedido tiene user_id, service_id, input_data, status, result_file_path, admin_notes, price_at_purchase, service_cost_snapshot y service_price_snapshot.
-
-Cada pedido pertenece a un usuario mediante la relación user.
-
-Cada pedido pertenece a un servicio mediante la relación service.
-
----
-
-## PRECIOS HISTÓRICOS DE PEDIDOS
-
-La tabla orders guarda información histórica del precio y costo del servicio al momento de la compra.
-
-El campo price_at_purchase guarda el precio del servicio cuando el usuario creó el pedido.
-
-El campo service_cost_snapshot guarda el costo interno del servicio al momento de la compra.
-
-El campo service_price_snapshot guarda el precio del servicio al momento de la compra.
-
-Estos campos permiten conservar el historial correcto de cada pedido aunque después cambie el precio o costo del servicio.
-
-Esto es útil porque si un servicio cambia de precio después, los pedidos anteriores conservan el precio original con el que fueron comprados.
-
----
-
-## DIFERENCIA ENTRE PRICE Y COST
-
-El campo price representa el precio que paga el cliente por el servicio.
-
-El campo cost representa el costo interno del servicio para el sistema o negocio.
-
-Por ejemplo, si un servicio tiene price de 100 y cost de 70, el cliente paga 100 y el costo interno registrado es 70.
-
----
-
-## DESCARGA DE RESULTADOS DE PEDIDOS
-
-La ruta /app/orders/{order}/download permite descargar el resultado de un pedido.
-
-Esta ruta requiere autenticación.
-
-Para descargar un resultado, el sistema valida que el usuario dueño del pedido sea el mismo usuario autenticado o que el usuario autenticado sea administrador.
-
-Si el usuario no es dueño del pedido y tampoco es administrador, el sistema devuelve error 403.
-
-Si el pedido no tiene archivo de resultado, el sistema devuelve error 404.
-
-Cuando el pedido sí tiene archivo de resultado, el sistema descarga el archivo desde el disco s3 usando la ruta guardada en result_file_path.
-
-El archivo se entrega con un nombre parecido a Resultado_ID.pdf.
-
-Esto significa que los documentos de resultado no se descargan libremente. Solo el cliente dueño del pedido o un administrador pueden descargar el resultado.
-
----
-
-## SOLICITUDES DE DEPÓSITO
-
-La tabla deposit_requests guarda solicitudes de depósito o recarga de saldo realizadas por los usuarios.
-
-Cada solicitud de depósito pertenece a un usuario mediante user_id.
-
-Si el usuario se elimina, sus solicitudes de depósito también se eliminan.
-
-Cada solicitud guarda bank_name, tracking_key, amount, proof_image_path, status y admin_notes.
-
-El campo bank_name guarda el nombre del banco.
-
-El campo tracking_key guarda la clave de rastreo.
-
-La clave de rastreo tracking_key debe ser única.
-
-El campo amount guarda el monto del depósito.
-
-El campo proof_image_path guarda la ruta del comprobante de pago.
-
-Cada solicitud de depósito tiene un campo status.
-
-Los estados posibles de una solicitud de depósito son:
-
-- pending
-- approved
-- rejected
+Los estados de una solicitud de depósito son pending, approved y rejected.
 
 pending significa que la solicitud está pendiente de revisión.
 
-approved significa que la solicitud fue aprobada.
+approved significa que el depósito fue aprobado y el saldo puede agregarse al usuario.
 
-rejected significa que la solicitud fue rechazada.
-
-Por defecto, una solicitud nueva se crea con estado pending.
-
-El campo admin_notes permite guardar notas del administrador sobre la solicitud de depósito.
+rejected significa que el depósito fue rechazado.
 
 ---
 
-## TRANSACCIONES
+Pregunta frecuente: ¿Qué hace DepositRequestResource?
 
-La tabla transactions guarda los movimientos de saldo de los usuarios.
-
-Cada transacción pertenece a un usuario mediante user_id.
-
-Si el usuario se elimina, sus transacciones también se eliminan.
-
-Cada transacción tiene un tipo en el campo type.
-
-Los tipos posibles de transacción son:
-
-- deposit
-- purchase
-- refund
-
-deposit representa un depósito o recarga de saldo.
-
-purchase representa una compra de un servicio.
-
-refund representa una devolución de saldo.
-
-El campo amount guarda el monto de la transacción.
-
-El sistema usa una relación polimórfica llamada reference para relacionar una transacción con otros elementos del sistema.
-
-La relación polimórfica reference usa reference_type y reference_id.
-
-El campo description guarda una explicación del movimiento.
+DepositRequestResource es el recurso de Filament que administra las solicitudes de depósito. Permite listar, crear, editar y eliminar solicitudes. Cada solicitud guarda usuario, banco, clave de rastreo, monto, comprobante, estado y notas administrativas. Los estados de depósito son pending, approved y rejected.
 
 ---
 
-## CATEGORÍAS
+## 6. SERVICIOS
 
-La tabla categories guarda las categorías de servicios del sistema.
+Los servicios se guardan en la tabla services.
 
-Cada categoría tiene id, name, description, created_at y updated_at.
+Cada servicio puede tener código, nombre, descripción, precio, costo, tipo de servicio, categoría, imagen, horario activo, tiempo de procesamiento, estado activo y formulario dinámico.
 
-Los servicios pueden relacionarse con una categoría mediante category_id.
+El campo price indica el precio que paga el usuario.
 
----
+El campo cost indica el costo interno del servicio.
 
-## SOLICITUDES DE SOPORTE
+El campo is_active indica si el servicio está activo.
 
-La tabla support_requests guarda solicitudes de soporte hechas por usuarios.
+El campo category_id relaciona el servicio con una categoría.
 
-Cada solicitud puede pertenecer a un usuario mediante user_id, pero este campo puede ser nulo.
-
-Si el usuario relacionado se elimina, la solicitud de soporte no se elimina, solamente queda sin usuario relacionado.
-
-El campo type indica el tipo de soporte.
-
-Por defecto, el tipo de soporte es whatsapp.
-
-La ruta /support/whatsapp permite acceder al soporte por WhatsApp.
-
-Esta ruta usa el controlador SupportRedirectController.
-
-La ruta requiere autenticación y tiene el nombre support.whatsapp.
-
----
-
-## REGISTROS DE ACTIVIDAD
-
-La tabla activity_logs guarda eventos o acciones importantes realizadas en el sistema.
-
-Cada registro puede estar relacionado con un usuario mediante user_id.
-
-El campo event guarda el tipo de evento.
-
-Ejemplos de eventos pueden ser created, updated o email_sent.
-
-El sistema usa una relación polimórfica llamada subject para relacionar el registro de actividad con diferentes tipos de elementos, como pedidos, usuarios u otros modelos.
-
-El campo description permite guardar una explicación del evento.
-
-El campo properties guarda información adicional en formato JSON.
-
-El campo ip_address permite guardar la dirección IP desde donde ocurrió la acción.
-
----
-
-## RUTAS PRINCIPALES DEL SISTEMA
-
-La ruta principal / revisa si el usuario está autenticado.
-
-Si el usuario ya inició sesión y es administrador, lo redirige a /admin.
-
-Si el usuario ya inició sesión y no es administrador, lo redirige a /app.
-
-Si el usuario no ha iniciado sesión, lo redirige a /app/login.
-
-La ruta /login redirige a /app/login.
-
-La ruta /support/whatsapp permite acceder al soporte por WhatsApp y requiere autenticación.
-
-La ruta dashboard muestra la vista dashboard y requiere que el usuario esté autenticado y tenga el correo verificado.
-
-La ruta profile muestra la vista profile y requiere autenticación.
-
-La ruta /app/orders/{order}/download permite descargar el resultado de un pedido y requiere autenticación.
-
-La ruta /ia-chat muestra una vista sencilla de chat con IA.
-
-La ruta /ia-test recibe preguntas por POST y las envía a Ollama.
-
----
-
-## INTERFAZ DE IA
-
-El sistema tiene una vista llamada ia-chat.blade.php.
-
-Esta vista muestra una página sencilla con el título Chat IA - Soluciones Edgar.
-
-La página incluye un textarea donde el usuario puede escribir una pregunta o prompt.
-
-Al presionar el botón Enviar, el navegador manda una petición POST a la ruta /ia-test.
-
-La petición incluye el token CSRF de Laravel para proteger la solicitud.
-
-La respuesta de la IA se muestra dentro del elemento respuesta.
-
-La ruta /ia-test recibe una pregunta enviada por el usuario y la manda a Ollama mediante una petición HTTP local.
-
-La ruta /ia-test usa el endpoint http://localhost:11434/api/generate.
-
-El modelo usado en esta ruta es llama3.2:1b.
-
-La ruta configura stream como false, por lo que espera la respuesta completa del modelo antes de devolverla al usuario.
-
-La ruta tiene timeout de 300 segundos para permitir que Ollama tenga más tiempo para responder.
-
-Si Ollama responde correctamente, el sistema devuelve el campo response como respuesta de la IA.
-
-Si Ollama devuelve error, el sistema responde con un mensaje de error.
-
-Si ocurre una excepción, el sistema devuelve el mensaje de error capturado.
-
----
-
-## DASHBOARD CON IA INTEGRADA
-
-La vista dashboard.blade.php muestra el dashboard básico del usuario autenticado.
-
-En el dashboard aparece el mensaje You're logged in.
-
-También incluye una sección visual llamada Asistente IA.
-
-Esta sección tiene un textarea para escribir una pregunta, un botón Enviar y un área para mostrar la respuesta.
-
-Cuando el usuario envía una pregunta desde el dashboard, se ejecuta una función JavaScript llamada sendAI.
-
-La función sendAI manda una petición POST a /ia-test con la pregunta escrita por el usuario.
-
-La respuesta se muestra directamente en la misma página.
-
-Esto significa que el dashboard tiene una integración básica con la IA usando la ruta /ia-test.
-
----
-
-## VISTA WELCOME
-
-La vista welcome.blade.php conserva la plantilla base de Laravel.
-
-Esta pantalla incluye enlaces y contenido general de Laravel como Documentation, Laracasts, Laravel News y Vibrant Ecosystem.
-
-Esta vista no representa una pantalla personalizada del negocio Soluciones Edgar.
-
-Para el RAG, no debe tomarse como una funcionalidad principal del sistema, sino como una vista base de Laravel que todavía existe en el proyecto.
-
----
-
-## GESTIÓN DE ÓRDENES EN FILAMENT
-
-El sistema tiene páginas de Filament para el recurso de órdenes.
-
-La página CreateOrder permite crear nuevos pedidos desde Filament.
-
-Antes de crear un pedido, CreateOrder revisa el usuario y el servicio seleccionados.
-
-Si el usuario o el servicio no existen, el sistema devuelve los datos sin aplicar validaciones adicionales.
-
-Si el usuario no tiene saldo suficiente para pagar el servicio y el usuario autenticado no es administrador, el sistema muestra una notificación de Saldo Insuficiente.
-
-La notificación informa cuánto saldo tiene el usuario y cuánto cuesta el servicio.
-
-Cuando el saldo es insuficiente, el sistema detiene la creación del pedido usando halt.
-
-Esto confirma que el sistema valida saldo antes de crear una orden desde Filament.
-
-Los administradores pueden crear pedidos aunque el saldo sea insuficiente, porque la condición permite excepción si el usuario autenticado es administrador.
-
-La página EditOrder permite editar pedidos existentes.
-
-En EditOrder existe una acción de eliminar pedido mediante DeleteAction.
-
-La página ListOrders muestra el listado de pedidos.
-
-En ListOrders existe una acción para crear pedidos mediante CreateAction.
-
----
-
-## GESTIÓN DE SERVICIOS EN FILAMENT
-
-El sistema tiene páginas de Filament para el recurso de servicios.
-
-La página CreateService permite crear nuevos servicios.
-
-La página EditService permite editar servicios existentes.
-
-En EditService existe una acción de eliminar servicio mediante DeleteAction.
-
-La página ListServices muestra el listado de servicios.
-
-En ListServices existe una acción para crear servicios mediante CreateAction.
-
-ListServices también organiza los servicios por pestañas.
-
-La primera pestaña se llama Todos y muestra todos los servicios.
-
-Además, el sistema consulta todas las categorías existentes y crea una pestaña por cada categoría.
-
-Cada pestaña de categoría filtra los servicios usando category_id.
-
-Esto permite navegar el catálogo de servicios por categoría dentro del panel Filament.
-
----
-
-## GESTIÓN DE SOLICITUDES DE DEPÓSITO EN FILAMENT
-
-El sistema tiene páginas de Filament para el recurso de solicitudes de depósito.
-
-La página CreateDepositRequest permite crear nuevas solicitudes de depósito.
-
-La página EditDepositRequest permite editar solicitudes de depósito existentes.
-
-En EditDepositRequest existe una acción de eliminar solicitud mediante DeleteAction.
-
-La página ListDepositRequests muestra el listado de solicitudes de depósito.
-
-En ListDepositRequests existe una acción para crear solicitudes mediante CreateAction.
-
----
-
-## GESTIÓN DE USUARIOS EN FILAMENT
-
-El sistema tiene una página ManageUsers para administrar usuarios.
-
-ManageUsers usa el recurso UserResource.
-
-Esta página permite manejar registros de usuarios desde Filament.
-
-También incluye una acción para crear usuarios mediante CreateAction.
-
----
-
-## PANEL ADMINISTRATIVO
-
-El panel administrativo está construido con Filament.
-
-El acceso al panel administrativo está restringido por el método canAccessPanel del modelo User.
-
-Si el panel es admin, solo pueden entrar usuarios con is_admin en true.
-
-Desde Filament se gestionan órdenes, servicios, solicitudes de depósito y usuarios.
-
----
-
-## RELACIONES PRINCIPALES DEL SISTEMA
-
-Un usuario puede tener muchos pedidos.
-
-Un usuario puede tener muchas solicitudes de depósito.
-
-Un usuario puede tener muchas transacciones.
+El campo form_schema guarda la estructura JSON del formulario dinámico que debe llenar el usuario.
 
 Un servicio puede tener muchos pedidos.
 
 Un servicio pertenece a una categoría.
 
-Un pedido pertenece a un usuario.
+---
 
-Un pedido pertenece a un servicio.
+Pregunta frecuente: ¿Qué servicios ofrece Soluciones Edgar?
 
-Una solicitud de depósito pertenece a un usuario.
-
-Una transacción pertenece a un usuario.
-
-Una transacción puede estar relacionada con otra entidad mediante una referencia polimórfica.
-
-Un registro de actividad puede estar relacionado con un usuario y con diferentes elementos del sistema mediante una relación polimórfica.
+Soluciones Edgar ofrece servicios de actas, SAT, IMSS, servicios generales, Infonavit y trámites vehiculares. Entre los servicios registrados están acta de nacimiento, acta de defunción, acta de divorcio, acta de matrimonio, CSF con CURP, CSF con RFC e IDCIF, localizar IDCIF, constancia de vigencia de derechos NSS, localizar NSS, semanas cotizadas, localizar AFORE, CURP actualizada, recibo CFE, antecedentes no penales, servicios de Infonavit, formatos de pago de tenencia CDMX y EDOMEX, y hoja REPUVE.
 
 ---
 
-## RESUMEN FUNCIONAL DEL SISTEMA
+Pregunta frecuente: ¿Qué hace ServiceResource?
 
-El sistema permite registrar usuarios y verificar sus correos electrónicos.
-
-El sistema permite distinguir entre usuarios normales y administradores mediante el campo is_admin.
-
-El sistema permite manejar saldo de usuario mediante el campo balance.
-
-El sistema permite registrar servicios con precio, costo, categoría, imagen, horario, estado activo y formulario dinámico.
-
-El sistema permite que los usuarios realicen pedidos asociados a servicios.
-
-El sistema guarda los datos ingresados por el usuario en input_data.
-
-El sistema maneja estados de pedidos: pending, processing, completed y rejected.
-
-El sistema permite guardar archivos de resultado para pedidos completados mediante result_file_path.
-
-El sistema permite guardar notas administrativas en pedidos.
-
-El sistema permite registrar solicitudes de depósito con banco, clave de rastreo, monto, comprobante y estado.
-
-El sistema maneja estados de depósito: pending, approved y rejected.
-
-El sistema registra movimientos de saldo mediante transacciones de tipo deposit, purchase y refund.
-
-El sistema permite organizar servicios mediante categorías.
-
-El sistema permite registrar solicitudes de soporte, principalmente de tipo whatsapp.
-
-El sistema permite registrar actividad importante mediante activity_logs.
-
-El sistema incluye una integración básica de IA con Ollama mediante la ruta /ia-test.
+ServiceResource es el recurso de Filament encargado de administrar el catálogo de servicios. Permite crear, listar, editar y eliminar servicios. También permite organizar servicios por categorías, manejar precios, costos, formularios dinámicos, imagen, estado activo y configuración de automatización por API externa.
 
 ---
 
----
+## 7. CATEGORÍAS
 
-## DETALLE COMPLETO DE ORDERRESOURCE
+Las categorías se guardan en la tabla categories.
 
-OrderResource es el recurso de Filament encargado de administrar los pedidos o trámites del sistema.
+Cada categoría tiene nombre, descripción y timestamps.
 
-El recurso usa el modelo Order.
+Las categorías sirven para organizar servicios.
 
-En la navegación de Filament, OrderResource aparece con el nombre Gestión de Trámites.
+Un servicio pertenece a una categoría mediante category_id.
 
-El grupo de navegación de OrderResource es Operaciones.
-
-El formulario de OrderResource tiene una sección llamada Información del Pedido.
-
-En Información del Pedido se selecciona el usuario mediante user_id.
-
-El campo user_id se relaciona con el modelo User y muestra el nombre del usuario.
-
-En Información del Pedido también se selecciona el servicio mediante service_id.
-
-El campo service_id se relaciona con el modelo Service y muestra el nombre del servicio.
-
-El campo service_id es reactivo. Cuando cambia el servicio seleccionado, el sistema limpia input_data para evitar que queden datos de un formulario anterior.
-
-OrderResource genera campos dinámicos de formulario usando el form_schema del servicio seleccionado.
-
-Si el servicio seleccionado no tiene form_schema, el sistema muestra un campo llamado input_data.text con la etiqueta Detalles adicionales.
-
-Si el servicio tiene form_schema, el sistema recorre cada campo definido y crea un TextInput dentro de input_data usando el name del campo.
-
-Cada campo dinámico usa la etiqueta label definida en form_schema.
-
-Si el campo dinámico está marcado como required, se vuelve obligatorio.
-
-Si el campo dinámico tiene regex, se aplica esa validación al TextInput.
-
-Esto confirma que los formularios de pedidos dependen del servicio seleccionado.
-
-OrderResource tiene una sección llamada Estado y Entrega.
-
-En Estado y Entrega se puede editar el estado del pedido.
-
-Los estados disponibles en el formulario son pending, processing, completed y rejected.
-
-En español, estos estados se muestran como Pendiente, En Proceso, Completado y Rechazado.
-
-El estado por defecto de un pedido es pending.
-
-OrderResource permite subir un archivo de resultado PDF mediante result_file_path.
-
-El archivo de resultado se guarda en el disco s3 dentro del directorio order-results.
-
-El campo result_file_path acepta archivos de tipo application/pdf.
-
-El archivo puede ser descargable y abierto desde Filament.
-
-OrderResource también permite agregar admin_notes, que son notas del administrador sobre el pedido.
-
-En la tabla de OrderResource se muestran columnas como ID, usuario, servicio, costo, estado y fecha.
-
-La columna price_at_purchase se muestra como Costo y se formatea como moneda MXN.
-
-La columna status se muestra como badge con colores.
-
-El estado pending se muestra en color gris.
-
-El estado processing se muestra en color info.
-
-El estado completed se muestra en color success.
-
-El estado rejected se muestra en color danger.
-
-La tabla de pedidos permite filtrar por estado.
-
-OrderResource tiene una acción de exportación llamada Exportar Reporte.
-
-La exportación usa AdminOrderExporter.
-
-Los formatos de exportación disponibles son Xlsx y Csv.
-
-OrderResource tiene una acción para editar pedidos.
-
-OrderResource tiene una acción llamada Descargar PDF.
-
-La acción Descargar PDF usa la ruta orders.download.
-
-La acción Descargar PDF solo es visible cuando el pedido tiene estado completed y tiene result_file_path.
-
-OrderResource tiene una acción llamada Subir Resultado.
-
-La acción Subir Resultado permite subir un PDF, agregar notas y actualizar el pedido.
-
-Cuando se sube el resultado, el sistema guarda result_file_path, actualiza admin_notes si existen y cambia el estado del pedido a completed.
-
-Después de subir el resultado, Filament muestra una notificación de Trámite completado.
-
-La acción Subir Resultado solo aparece cuando el pedido todavía no está completed.
-
-La tabla de pedidos se ordena por created_at de forma descendente.
-
-Las páginas de OrderResource son index, create y edit.
+Las categorías usadas por el sistema incluyen Actas, SAT, IMSS, Servicios Generales, Infonavit y Vehículos.
 
 ---
 
-## DETALLE COMPLETO DE SERVICERESOURCE
+Pregunta frecuente: ¿Para qué sirven las categorías?
 
-ServiceResource es el recurso de Filament encargado de administrar el catálogo de servicios.
-
-El recurso usa el modelo Service.
-
-En la navegación de Filament, ServiceResource aparece como Catálogo de Servicios.
-
-El grupo de navegación de ServiceResource es Operaciones.
-
-ServiceResource tiene prioridad de navegación antes que OrderResource porque su navigationSort es 1.
-
-El formulario de ServiceResource tiene una sección llamada Información Principal.
-
-En Información Principal se editan datos básicos como código, nombre, categoría, tipo legacy y descripción.
-
-El campo code representa el código único del servicio.
-
-El campo code es obligatorio, único y tiene longitud máxima de 255 caracteres.
-
-El campo name representa el nombre del servicio.
-
-El campo name es obligatorio.
-
-El campo category_id permite seleccionar una categoría relacionada.
-
-El campo category_id se relaciona con category.name.
-
-El campo category_id es buscable y precargado.
-
-Desde el campo category_id se puede crear una categoría nueva con nombre y descripción.
-
-El campo service_type representa el tipo de servicio interno o legacy.
-
-El campo description guarda la descripción del servicio.
-
-ServiceResource tiene una sección llamada Precios y Tiempos.
-
-En Precios y Tiempos se capturan price, cost, processing_time y active_schedule.
-
-El campo price se muestra como Precio al Público.
-
-El campo cost se muestra como Costo Interno o Gasto.
-
-Los campos price y cost son numéricos, obligatorios y usan prefijo de pesos.
-
-El campo processing_time guarda el tiempo de procesamiento.
-
-El campo active_schedule guarda el horario activo y por defecto usa 8:00 AM a 8:00 PM.
-
-ServiceResource tiene una sección llamada Multimedia y Estado.
-
-En Multimedia y Estado se puede subir la imagen del servicio mediante image_path.
-
-La imagen del servicio se guarda en el directorio services.
-
-El disco usado para image_path es el disco configurado por defecto en filesystems.
-
-El campo is_active indica si el servicio está activo.
-
-ServiceResource tiene una sección llamada Campos Personalizados o Formulario.
-
-Esta sección permite configurar form_schema mediante un Repeater.
-
-El Repeater form_schema permite agregar campos extra que el usuario debe llenar al solicitar el servicio.
-
-Cada campo personalizado tiene name, label y required.
-
-El campo name es el identificador interno del campo personalizado.
-
-El name no debe tener espacios y solo acepta letras minúsculas, números y guion bajo.
-
-El campo label es la etiqueta visible para el usuario.
-
-El campo required indica si el campo será obligatorio.
-
-En la tabla de ServiceResource los servicios se muestran en formato de tarjetas o grid.
-
-La tabla usa contentGrid con 2 columnas en pantallas medianas y 3 columnas en pantallas xl.
-
-Cada servicio muestra código, nombre, categoría, descripción, horario activo, tiempo estimado, pendientes y precio.
-
-El active_schedule se muestra con el texto SERVICIO ACTIVO.
-
-El processing_time se muestra con el prefijo Tiempo estimado.
-
-ServiceResource calcula una columna pending que cuenta los pedidos del servicio con estado pending o processing.
-
-Si el servicio tiene pedidos pendientes o en proceso, la tarjeta muestra una alerta de Atención Requerida.
-
-Si no tiene pendientes, muestra Sin pendientes.
-
-La tabla agrupa los servicios por categoría.
-
-El grupo por defecto es category.name.
-
-ServiceResource tiene una acción llamada SOLICITAR.
-
-La acción SOLICITAR redirige a la ruta filament.dashboard.pages.buy-service con el id del servicio.
-
-La acción SOLICITAR solo es visible si el servicio está activo.
-
-ServiceResource también tiene acción de editar.
-
-ServiceResource permite eliminación masiva mediante DeleteBulkAction.
-
-Las páginas de ServiceResource son index, create y edit.
+Las categorías sirven para organizar el catálogo de servicios. Por ejemplo, existen categorías como Actas, SAT, IMSS, Servicios Generales, Infonavit y Vehículos.
 
 ---
 
-## DETALLE COMPLETO DE DEPOSITREQUESTRESOURCE
+## 8. PEDIDOS O TRÁMITES
 
-DepositRequestResource es el recurso de Filament encargado de administrar solicitudes de saldo o depósitos.
+Los pedidos se guardan en la tabla orders.
 
-El recurso usa el modelo DepositRequest.
+Cada pedido pertenece a un usuario y a un servicio.
 
-En la navegación de Filament aparece como Solicitudes de Saldo.
+Un pedido guarda user_id, service_id, input_data, status, result_file_path, admin_notes, price_at_purchase, service_cost_snapshot, service_price_snapshot y datos de API externa.
 
-El grupo de navegación es Finanzas.
+El campo input_data guarda la información capturada del usuario, como CURP, RFC, NSS, placa u otros datos según el servicio.
 
-El formulario de DepositRequestResource tiene una sección llamada Instrucciones de Depósito.
+El campo result_file_path guarda la ruta del archivo de resultado.
 
-Esta sección muestra instrucciones de transferencia y una imagen de pago ubicada en images/pays.jpeg.
+El campo admin_notes guarda notas del administrador.
 
-La sección indica que el monto mínimo es de 300 pesos MXN.
+El campo price_at_purchase guarda el precio del servicio al momento de la compra.
 
-También indica que un envío menor puede causar pérdida de saldo y que solo se aceptan transferencias electrónicas.
-
-El formulario tiene una sección llamada Detalles de la Transferencia.
-
-El campo user_id se asigna automáticamente con el id del usuario autenticado.
-
-El campo bank_name guarda el banco emisor.
-
-El campo tracking_key guarda la clave de rastreo o referencia.
-
-El tracking_key es obligatorio y único.
-
-El campo amount guarda el monto enviado.
-
-El monto amount es numérico, obligatorio y tiene mínimo de 300.
-
-El campo proof_image_path permite subir una imagen del comprobante de pago.
-
-El comprobante se guarda en el directorio deposit-proofs.
-
-El campo admin_notes solo es visible si el usuario autenticado es administrador.
-
-En la tabla de DepositRequestResource se muestran usuario, banco, clave de rastreo, monto, comprobante, estado y fecha.
-
-La clave de rastreo es copiable.
-
-El monto se muestra como moneda MXN.
-
-El comprobante se muestra como imagen y puede abrirse en una nueva pestaña.
-
-Los estados de depósito se muestran como badge.
-
-El estado pending se muestra como Pendiente.
-
-El estado approved se muestra como Aprobado.
-
-El estado rejected se muestra como Rechazado.
-
-La tabla permite filtrar por estado.
-
-DepositRequestResource tiene una acción llamada Aprobar y Abonar.
-
-La acción Aprobar y Abonar solo es visible para administradores y solo cuando la solicitud está pending.
-
-La aprobación requiere confirmación.
-
-Al aprobar, el sistema usa una transacción de base de datos.
-
-El sistema bloquea el registro con lockForUpdate para evitar condiciones de carrera.
-
-Si la solicitud ya fue procesada antes, el sistema muestra una notificación de error y no la vuelve a procesar.
-
-Si sigue pendiente, el sistema cambia el estado a approved.
-
-El comentario del código indica que DepositRequestObserver se encarga de agregar el saldo y notificar al usuario cuando se aprueba el depósito.
-
-DepositRequestResource tiene una acción llamada Rechazar.
-
-La acción Rechazar solo es visible para administradores y solo cuando la solicitud está pending.
-
-Para rechazar, el administrador debe escribir un motivo.
-
-Al rechazar, el sistema cambia el estado a rejected y guarda el motivo en admin_notes.
-
-DepositRequestResource también tiene una acción ViewAction para ver la solicitud.
-
-La eliminación masiva solo es visible para administradores.
-
-Al eliminar solicitudes en masa, el sistema no elimina solicitudes aprobadas.
-
-Solo se eliminan solicitudes pendientes o rechazadas.
-
-Si algunos registros no se eliminan porque ya estaban aprobados, el sistema muestra una notificación de advertencia.
-
-DepositRequestResource ordena las solicitudes por created_at de forma descendente.
-
-DepositRequestResource filtra la consulta según el tipo de usuario.
-
-Si el usuario no es administrador, solo ve sus propias solicitudes de depósito.
-
-Si el usuario es administrador, puede ver todas las solicitudes.
-
-Las páginas de DepositRequestResource son index, create y edit.
-
----
-
-## DETALLE COMPLETO DE USERRESOURCE
-
-UserResource es el recurso de Filament encargado de administrar usuarios.
-
-El recurso usa el modelo User.
-
-En la navegación de Filament aparece dentro del grupo Administración.
-
-El nombre del recurso es Usuario y el plural es Catálogo de Usuarios.
-
-El formulario de UserResource tiene una sección llamada Información Personal.
-
-En Información Personal se editan nombre, correo, contraseña, fecha de verificación y teléfono.
-
-El campo name es obligatorio.
-
-El campo email es obligatorio y debe tener formato de correo electrónico.
-
-El campo password se captura como contraseña.
-
-El campo password solo se guarda si tiene valor.
-
-El password es obligatorio cuando se crea un usuario nuevo.
-
-El campo email_verified_at permite establecer la fecha de verificación del correo.
-
-El campo phone guarda el teléfono del usuario.
-
-UserResource tiene una sección llamada Información de Empresa.
-
-En Información de Empresa se edita account_type, company_name e is_verified_company.
-
-El campo account_type permite elegir entre Personal y Empresa.
-
-El campo account_type es obligatorio y reactivo.
-
-El campo company_name solo se muestra cuando account_type es company.
-
-El campo is_verified_company solo se muestra cuando account_type es company.
-
-UserResource tiene una sección llamada Sistema.
-
-En Sistema se editan balance e is_admin.
-
-El campo balance es numérico, obligatorio, tiene prefijo de pesos y por defecto es 0.
-
-El campo is_admin indica si el usuario es administrador.
-
-En la tabla de UserResource se muestran nombre, email, teléfono, tipo de cuenta, verificación de empresa, saldo, fechas y si es administrador.
-
-La columna account_type se muestra como badge.
-
-El tipo personal se muestra como Personal.
-
-El tipo company se muestra como Empresa.
-
-La columna is_verified_company se muestra como ícono booleano.
-
-El saldo se muestra como moneda MXN.
-
-La columna is_admin se muestra como ícono booleano.
-
-UserResource tiene acciones para editar y eliminar usuarios.
-
-También permite eliminación masiva.
-
-La página principal de UserResource es ManageUsers.
-
----
-
-## ACLARACIONES IMPORTANTES PARA EL RAG
-
-Los estados reales de pedido son pending, processing, completed y rejected.
-
-No debe decirse que el estado cancelado existe, a menos que se encuentre otra migration o código que lo agregue.
-
-El sistema permite subir resultados PDF de pedidos y al hacerlo cambia el pedido a completed.
-
-La descarga de PDF solo se muestra cuando el pedido está completed y tiene result_file_path.
-
-El sistema de depósitos tiene monto mínimo de 300 pesos según DepositRequestResource.
-
-Las solicitudes de depósito aprobadas no se eliminan en eliminación masiva.
-
-Los clientes no administradores solo ven sus propias solicitudes de depósito.
-
-Los administradores pueden ver todas las solicitudes de depósito.
-
-La aprobación de depósitos cambia el estado a approved y el saldo se agrega mediante DepositRequestObserver, según el comentario del código.
-
-La lógica del observer debe revisarse en el archivo correspondiente para confirmar exactamente cómo se abona el saldo y cómo se notifica al usuario.
-
-## PREGUNTAS FRECUENTES PARA EL RAG
-
-### ¿Qué tecnologías usa el sistema?
-
-El sistema usa Laravel, PHP, Eloquent ORM, migrations, seeders, Filament, Livewire Volt, notificaciones de Laravel, almacenamiento compatible con S3 y Ollama con el modelo llama3.2:1b para la integración básica de IA.
-
-### ¿Qué servicios ofrece el sistema?
-
-El sistema ofrece servicios de actas, SAT, IMSS, servicios generales, Infonavit y vehículos.
-
-### ¿Cuáles son los estados de un pedido?
+Los campos service_cost_snapshot y service_price_snapshot guardan el costo y precio del servicio al momento de crear el pedido.
 
 Los estados de un pedido son pending, processing, completed y rejected.
 
-### ¿Qué significa pending en un pedido?
+pending significa pendiente.
 
-Pending significa que el pedido está pendiente.
+processing significa en proceso.
 
-### ¿Qué significa processing en un pedido?
+completed significa completado.
 
-Processing significa que el pedido está en proceso.
+rejected significa rechazado.
 
-### ¿Qué significa completed en un pedido?
+---
 
-Completed significa que el pedido fue completado.
+Pregunta frecuente: ¿Cuáles son los estados de un pedido?
 
-### ¿Qué significa rejected en un pedido?
+Los estados de un pedido son pending, processing, completed y rejected. Pending significa pendiente, processing significa en proceso, completed significa completado y rejected significa rechazado.
 
-Rejected significa que el pedido fue rechazado.
+---
 
-### ¿Qué datos guarda un pedido?
+Pregunta frecuente: ¿Cómo se procesan los pedidos?
 
-Un pedido guarda el usuario, servicio, datos ingresados, estado, archivo de resultado, notas administrativas, precio de compra, costo del servicio al momento de la compra y precio del servicio al momento de la compra.
+En Soluciones Edgar, los pedidos se procesan cuando un usuario solicita un servicio. Primero se crea el pedido relacionado con el usuario y el servicio. También se guardan los datos capturados en input_data, como CURP, RFC, NSS, placa u otros datos según el trámite.
 
-### ¿Qué es form_schema?
+Después el pedido puede manejarse de forma manual o automática.
 
-form_schema es el campo JSON de servicios que guarda la estructura del formulario dinámico que debe llenar el usuario.
+Si el servicio es manual, el administrador revisa el pedido, realiza el trámite y sube el resultado.
 
-### ¿Qué es input_data?
+Si el servicio es automático, el sistema despacha ProcessExternalOrderJob. Este Job usa ExternalOrderAutomationService para procesar el pedido por API externa.
 
-input_data es el campo de pedidos donde se guardan los datos que el usuario ingresó al solicitar un servicio.
+Cuando el proveedor configurado es dhru, se usa DhruApiService. En modo simulación, DhruApiService genera una orden externa con prefijo SIM, crea un archivo de resultado, actualiza api_status a completed, marca processed_by_api como verdadero y guarda el reporte en api_report.
 
-### ¿Cómo se identifica a un administrador?
+Si ocurre un error, el sistema guarda api_status como failed y registra el error en api_error_message. Si el pedido necesita atención humana, puede quedar como manual_review.
 
-Un administrador se identifica mediante el campo is_admin en true.
+Cuando el proceso termina correctamente, el resultado se guarda en result_file_path y el usuario o administrador puede descargarlo.
 
-### ¿Cómo funciona el saldo del usuario?
+---
 
-El saldo se guarda en el campo balance del usuario. El sistema puede incrementar saldo con credit o addBalance y descontarlo con subtractBalance.
+## 9. AUTOMATIZACIÓN POR API EXTERNA
 
-### ¿Qué pasa si un usuario no tiene saldo suficiente?
+El sistema tiene una automatización por API externa para procesar algunos pedidos sin intervención manual.
 
-Si el usuario no es administrador y no tiene saldo suficiente, el sistema lanza el error Saldo insuficiente y no realiza el descuento.
+La automatización no reemplaza todos los trámites. Solo aplica a servicios configurados como automáticos.
 
-### ¿Qué tipos de transacciones existen?
+Los servicios pueden tener automation_type.
 
-Los tipos de transacciones son deposit, purchase y refund.
+Los valores de automation_type son manual, semi_automatic y automatic.
 
-### ¿Qué estados tiene una solicitud de depósito?
+manual significa que el trámite lo atiende el administrador.
 
-Los estados de una solicitud de depósito son pending, approved y rejected.
+semi_automatic significa que puede requerir apoyo o revisión del administrador.
 
-### ¿Qué diferencia hay entre price y cost?
+automatic significa que el sistema puede enviar el pedido al flujo de API externa.
 
-price es el precio que paga el cliente. cost es el costo interno del servicio.
+Los servicios también pueden tener external_provider, external_service_id y api_handler.
 
-### ¿Por qué los pedidos guardan price_at_purchase?
+external_provider indica el proveedor externo, por ejemplo dhru.
 
-Para conservar el precio original del servicio al momento de la compra, aunque después el precio cambie.
+external_service_id indica el ID del servicio en el proveedor externo.
 
-### ¿Qué son service_cost_snapshot y service_price_snapshot?
+api_handler indica qué manejador o clase se usa para procesar el servicio.
 
-Son copias del costo y precio del servicio al momento en que se creó el pedido.
+---
 
-### ¿Cómo se cargan los datos iniciales del sistema?
+Pregunta frecuente: ¿Qué significa automatización por API externa?
 
-Los datos iniciales se cargan con DatabaseSeeder, que ejecuta AdminSeeder y ServicesSeeder.
+Significa que algunos servicios pueden procesarse automáticamente usando un proveedor externo. Si el servicio está configurado como automatic, el sistema envía el pedido al flujo de API externa, guarda el estado, genera un resultado y marca el pedido como procesado por API externa.
 
-### ¿Qué hace ServicesSeeder?
+---
 
-ServicesSeeder crea o actualiza el catálogo inicial de servicios del sistema.
+## 10. DHRU API SERVICE
 
-### ¿Qué hace AdminSeeder?
+DhruApiService es el servicio encargado de representar la conexión con el proveedor externo Dhru.
 
-AdminSeeder crea o actualiza el usuario administrador inicial del sistema.
+DhruApiService tiene métodos como isEnabled, getServices, placeOrder, checkOrderStatus y getOrderResult.
 
-### ¿Qué hace DatabaseSeeder?
+Cuando DHRU_API_ENABLED está en false, DhruApiService funciona en modo simulación.
 
-DatabaseSeeder ejecuta los seeders principales para cargar datos iniciales del sistema.
+En modo simulación, el sistema no hace llamadas reales a internet.
 
-### ¿Qué categorías maneja el sistema?
+En modo simulación, DhruApiService genera IDs externos simulados con prefijo SIM.
 
-El sistema maneja categorías como Actas, SAT, IMSS, Servicios Generales, Infonavit y Vehículos.
+En modo simulación, se genera un archivo de resultado de prueba.
 
-### ¿Qué relación tiene un usuario con los pedidos?
+En modo simulación, el pedido puede quedar como completed y processed_by_api en true.
 
-Un usuario puede tener muchos pedidos.
+Cuando la API real esté habilitada, el servicio debe usar las credenciales configuradas en el archivo .env y consumir el proveedor real.
 
-### ¿Qué relación tiene un servicio con los pedidos?
+---
 
-Un servicio puede tener muchos pedidos.
+Pregunta frecuente: ¿Qué hace DhruApiService?
 
-### ¿Qué relación tiene un pedido con un usuario y un servicio?
+DhruApiService es el servicio que conecta o simula la conexión con el proveedor externo Dhru. Puede consultar servicios, colocar órdenes, revisar estados y obtener resultados. Si DHRU_API_ENABLED está en false, trabaja en modo simulación y genera resultados de prueba sin consumir internet.
 
-Un pedido pertenece a un usuario y pertenece a un servicio.
+---
 
-### ¿Qué información guarda una solicitud de soporte?
+## 11. EXTERNAL ORDER AUTOMATION SERVICE
 
-Guarda el usuario relacionado, si existe, el tipo de soporte y las fechas de creación y actualización.
+ExternalOrderAutomationService es el orquestador de la automatización externa.
 
-### ¿Qué información guarda activity_logs?
+Este servicio decide qué hacer según el tipo de automatización del servicio.
 
-Guarda eventos del sistema, usuario relacionado, elemento relacionado, descripción, propiedades adicionales, dirección IP y fechas.
+Si el servicio es manual, el pedido queda para revisión manual.
 
-### ¿Cómo funciona la IA del sistema?
+Si el servicio es semi_automatic, el pedido puede quedar para revisión manual con nota.
 
-El sistema tiene una vista de chat de IA y una integración en el dashboard. Ambas mandan preguntas a la ruta /ia-test. Esa ruta envía la pregunta a Ollama usando el endpoint local http://localhost:11434/api/generate con el modelo llama3.2:1b y devuelve la respuesta generada.
+Si el servicio es automatic, el sistema intenta procesarlo con el proveedor externo configurado.
 
-### ¿La ruta /ia-test usa RAG?
+ExternalOrderAutomationService puede usar DhruApiService cuando el proveedor es dhru.
 
-En el código web.php compartido, la ruta /ia-test consulta directamente a Ollama. No se observa recuperación vectorial en esa ruta. Si el sistema usa RAG, esa lógica debe estar en otro archivo o script.
+Si el procesamiento termina correctamente, guarda información de API en el pedido.
 
-### ¿Cómo se descarga el resultado de un pedido?
+Si falla, guarda el error en api_error_message y puede dejar el estado API como failed o manual_review.
 
-El usuario autenticado puede descargar el resultado desde /app/orders/{order}/download. El sistema valida que el usuario sea dueño del pedido o que sea administrador. Si el pedido no tiene archivo, devuelve error 404. Si no tiene permiso, devuelve error 403.
+---
 
-### ¿Cómo se gestionan servicios en Filament?
+Pregunta frecuente: ¿Qué hace ExternalOrderAutomationService?
 
-Filament permite crear, listar, editar y eliminar servicios. La lista de servicios tiene pestañas por categoría y una pestaña general llamada Todos.
+ExternalOrderAutomationService decide y ejecuta el flujo de automatización de un pedido. Revisa si el servicio es manual, semiautomático o automático. Si es automático y el proveedor es dhru, llama a DhruApiService. Luego actualiza el estado API, el reporte, el archivo de resultado o el error del pedido.
 
-### ¿Cómo se gestionan órdenes en Filament?
+---
 
-Filament permite listar, crear, editar y eliminar órdenes. Al crear una orden, el sistema valida que el usuario tenga saldo suficiente, excepto cuando el usuario autenticado es administrador.
+## 12. PROCESS EXTERNAL ORDER JOB
+
+ProcessExternalOrderJob es un Job de Laravel que procesa pedidos automáticos en segundo plano o de forma inmediata según la configuración de colas.
+
+El Job recibe un pedido.
+
+El Job llama a ExternalOrderAutomationService.
+
+El Job maneja errores con try/catch.
+
+El Job tiene reintentos y timeout.
+
+Si QUEUE_CONNECTION está en sync, el Job se ejecuta inmediatamente al crear el pedido.
+
+Si QUEUE_CONNECTION usa database o redis, se necesita ejecutar php artisan queue:work.
+
+---
+
+Pregunta frecuente: ¿Qué hace ProcessExternalOrderJob?
+
+ProcessExternalOrderJob recibe un pedido y llama a ExternalOrderAutomationService para procesarlo por API externa. Si la cola está en sync, se ejecuta inmediatamente. Si hay un error, guarda la información para que el administrador pueda revisarla.
+
+---
+
+## 13. CAMPOS DE API EN PEDIDOS
+
+Los pedidos pueden guardar campos relacionados con API externa.
+
+processed_by_api indica si el pedido fue procesado por API externa.
+
+api_status indica el estado del procesamiento externo.
+
+external_provider indica el proveedor usado, por ejemplo dhru.
+
+external_order_id indica el ID de orden generado por el proveedor externo.
+
+api_processed_at indica la fecha y hora del procesamiento.
+
+api_report guarda el reporte del proceso externo.
+
+api_error_message guarda el error si algo falla.
+
+Los estados API pueden ser pending, queued, sent, processing, completed, failed y manual_review, según la implementación del flujo.
+
+completed significa que la API terminó correctamente.
+
+failed significa que hubo error.
+
+manual_review significa que necesita revisión humana.
+
+queued significa que el pedido fue puesto en cola.
+
+---
+
+Pregunta frecuente: ¿Qué información guarda un pedido procesado por API?
+
+Guarda processed_by_api, api_status, external_provider, external_order_id, api_processed_at, api_report y api_error_message. Estos campos permiten saber si el pedido fue automatizado, qué proveedor se usó, cuál fue la orden externa, qué ocurrió y si hubo errores.
+
+---
+
+## 14. DESCARGA DE RESULTADOS
+
+El resultado de un pedido se guarda en result_file_path.
+
+El usuario autenticado puede descargar el resultado desde la ruta /app/orders/{order}/download.
+
+El sistema valida que el usuario sea dueño del pedido o que sea administrador.
+
+Si el usuario no tiene permiso, el sistema devuelve error 403.
+
+Si el pedido no tiene archivo de resultado, el sistema devuelve error 404.
+
+La descarga puede buscar el archivo en el disco public o en el disco s3, dependiendo de dónde se haya guardado.
+
+En modo simulación de API, el resultado puede guardarse como archivo de texto en storage/app/public/results.
+
+---
+
+Pregunta frecuente: ¿Cómo se descarga el resultado de un pedido?
+
+El resultado se descarga desde /app/orders/{order}/download. El sistema valida permisos, revisa que exista result_file_path y descarga el archivo desde public o s3. Si el archivo no existe, devuelve 404.
+
+---
+
+## 15. ORDERRESOURCE EN FILAMENT
+
+OrderResource es el recurso de Filament encargado de administrar pedidos o trámites.
+
+En Filament, OrderResource aparece como Gestión de Trámites.
+
+OrderResource permite listar, crear, editar y eliminar pedidos.
+
+El formulario permite seleccionar usuario y servicio.
+
+El formulario usa user_id para relacionar el pedido con User.
+
+El formulario usa service_id para relacionar el pedido con Service.
+
+El campo service_id puede ser reactivo y limpiar input_data al cambiar de servicio.
+
+OrderResource puede generar campos dinámicos usando el form_schema del servicio.
+
+OrderResource muestra información del pedido, estado, archivo de resultado y notas administrativas.
+
+OrderResource también muestra información de API externa como api_status, external_provider, external_order_id, api_processed_at, processed_by_api, api_report y api_error_message.
+
+OrderResource tiene filtros para api_status y processed_by_api.
+
+OrderResource puede incluir acciones para procesar por API externa y acciones masivas para generar reportes de cierre.
+
+---
+
+Pregunta frecuente: ¿Qué hace OrderResource?
+
+OrderResource administra los pedidos o trámites desde Filament. Permite crear, listar, editar y eliminar pedidos, seleccionar usuario y servicio, capturar datos dinámicos, revisar estado, subir resultado, ver información de API externa, filtrar pedidos y ejecutar acciones como procesar por API externa o generar reportes de cierre.
+
+---
+
+## 16. SERVICERESOURCE EN FILAMENT
+
+ServiceResource es el recurso de Filament encargado de administrar servicios.
+
+Permite crear, listar, editar y eliminar servicios.
+
+Permite gestionar nombre, código, descripción, precio, costo, categoría, imagen, horario activo, tiempo de procesamiento, estado activo y form_schema.
+
+ServiceResource organiza servicios por pestañas de categoría.
+
+ServiceResource puede tener una sección de automatización por API externa.
+
+En la sección de automatización se configura automation_type, external_provider, external_service_id y api_handler.
+
+Los valores de automation_type pueden ser manual, semi_automatic y automatic.
+
+---
+
+Pregunta frecuente: ¿Qué hace ServiceResource?
+
+ServiceResource administra el catálogo de servicios desde Filament. Permite configurar datos generales del servicio, precio, costo, categoría, formularios dinámicos y automatización por API externa. También permite filtrar servicios por categorías.
+
+---
+
+## 17. DEPOSITREQUESTRESOURCE EN FILAMENT
+
+DepositRequestResource es el recurso de Filament encargado de administrar solicitudes de depósito.
+
+Permite crear, listar, editar y eliminar solicitudes de depósito.
+
+Muestra datos como usuario, banco, clave de rastreo, monto, comprobante, estado y notas administrativas.
+
+Permite revisar si una solicitud está pending, approved o rejected.
+
+Su objetivo es ayudar al administrador a validar recargas de saldo.
+
+---
+
+Pregunta frecuente: ¿Qué hace DepositRequestResource?
+
+DepositRequestResource administra las solicitudes de depósito. Permite al administrador revisar banco, clave de rastreo, monto, comprobante, estado y notas. Los estados son pending, approved y rejected.
+
+---
+
+## 18. USERRESOURCE EN FILAMENT
+
+UserResource o ManageUsers permite administrar usuarios desde Filament.
+
+Permite manejar registros de usuarios.
+
+Puede incluir una acción para crear usuarios.
+
+El sistema usa is_admin para identificar administradores.
+
+El sistema usa balance para manejar saldo de usuario.
+
+---
+
+Pregunta frecuente: ¿Qué hace UserResource?
+
+UserResource permite administrar usuarios en Filament. Permite revisar o crear usuarios y manejar información importante como nombre, correo, saldo y rol de administrador.
+
+---
+
+## 19. SOPORTE Y REGISTROS DE ACTIVIDAD
+
+La tabla support_requests guarda solicitudes de soporte.
+
+Una solicitud de soporte puede pertenecer a un usuario.
+
+El campo type puede tener valores como whatsapp.
+
+La tabla activity_logs guarda eventos del sistema.
+
+activity_logs puede guardar user_id, event, subject_type, subject_id, description, properties, ip_address y timestamps.
+
+Los registros de actividad sirven para dejar evidencia de acciones importantes.
+
+---
+
+Pregunta frecuente: ¿Qué guarda activity_logs?
+
+activity_logs guarda eventos importantes del sistema, usuario relacionado, elemento relacionado, descripción, propiedades adicionales, dirección IP y fechas.
+
+---
+
+## 20. IA LOCAL, RAG Y CHAT ADMINISTRATIVO
+
+El sistema tiene integración con IA local mediante Ollama.
+
+El modelo usado es llama3.2:1b.
+
+El sistema RAG usa Python y ChromaDB.
+
+El archivo conocimiento_soluciones_edgar.txt se ingesta con ingestar.py.
+
+ingestar.py lee el documento, limpia el texto, lo divide en fragmentos, genera embeddings y guarda los fragmentos en ChromaDB.
+
+rag_bridge.py recibe una pregunta, busca contexto en ChromaDB y manda el contexto a Ollama para generar una respuesta.
+
+La ruta /ia-test conecta el chat del panel con comandos administrativos, RAG y Ollama.
+
+El chat administrativo puede responder preguntas sobre la base de conocimiento y también ejecutar comandos especiales si el usuario es administrador.
+
+---
+
+Pregunta frecuente: ¿Cómo funciona la IA del sistema?
+
+La IA funciona localmente con Ollama y el modelo llama3.2:1b. Para responder sobre el proyecto, el sistema usa RAG: primero busca fragmentos en ChromaDB y después manda ese contexto a Ollama para generar una respuesta basada en la información del sistema.
+
+---
+
+Pregunta frecuente: ¿Qué es RAG en este proyecto?
+
+RAG significa Retrieval-Augmented Generation. En Soluciones Edgar se usa para que la IA no responda solo con conocimiento general, sino con información real del archivo conocimiento_soluciones_edgar.txt guardada en ChromaDB.
+
+---
+
+## 21. COMANDOS DEL CHAT ADMINISTRATIVO
+
+El chat administrativo puede funcionar como asistente del administrador.
+
+Algunos comandos consultan la base de conocimiento RAG.
+
+Otros comandos consultan datos reales de la base de datos mediante AdminChatCommandService.
+
+El comando para generar reporte de cierre no depende del TXT del RAG. Ese comando lo detecta AdminChatCommandService y consulta directamente los pedidos reales de la base de datos.
+
+Comandos útiles:
+
+- Que servicios ofrece Soluciones Edgar
+- Cuales son los estados de un pedido
+- Como funciona el saldo del usuario
+- Que tecnologias usa el sistema
+- Que hace DepositRequestResource
+- Que hace ServiceResource
+- Que hace OrderResource
+- Como se procesan los pedidos
+- Genera un reporte de los últimos 5 trámites
+- Genera un reporte del último trámite
+- Reporte de cierre
+- Resume los pedidos fallidos
+- Qué quedó pendiente de revisión
+- Trámites en revisión manual
+- Resumen de trámites completados hoy
+- Cierre de hoy
+
+---
+
+Pregunta frecuente: ¿Por qué el comando de reporte no depende del RAG?
+
+Porque un reporte de cierre debe usar datos reales y actuales de la base de datos, no solo texto del documento de conocimiento. Por eso AdminChatCommandService intercepta el mensaje, consulta los pedidos reales, genera el reporte y puede usar Ollama para redactar un resumen administrativo.
+
+---
+
+## 22. REPORTE DE CIERRE DE PEDIDOS
+
+El sistema puede generar reportes de cierre para pedidos procesados.
+
+El reporte puede crearse desde una acción masiva en OrderResource o desde el chat administrativo mediante comandos.
+
+El reporte se guarda como archivo .txt en storage/app/public/reports.
+
+El nombre del archivo puede tener el formato reporte-cierre-pedidos-YYYYMMDD-HHMMSS.txt.
+
+El reporte incluye fecha, total de pedidos, completados, pendientes, en proceso, rechazados, procesados por API externa, fallidos por API, revisión manual y proveedores usados.
+
+El reporte también incluye detalle de pedidos: pedido, servicio, usuario, estado, processed_by_api, api_status, proveedor, orden externa, reporte API y error.
+
+El resumen final puede generarse con Ollama local.
+
+Si Ollama no está disponible, el sistema puede generar un resumen básico con PHP.
+
+---
+
+Pregunta frecuente: ¿Qué contiene el reporte de cierre?
+
+El reporte de cierre contiene resumen general de pedidos, cantidades por estado, pedidos procesados por API externa, fallos, revisión manual, proveedores utilizados, detalle de cada pedido, reportes API, errores y un resumen final generado con Ollama o con PHP si Ollama no está disponible.
+
+---
+
+## 23. JUSTIFICACIÓN DEL USO DE IA
+
+La IA no se usa solo para buscar información que ya aparece en pantalla.
+
+La IA se usa como asistente administrativo para explicar el sistema, recuperar información técnica del proyecto, analizar pedidos, redactar reportes de cierre y generar resúmenes administrativos.
+
+La automatización por API externa se encarga del procesamiento automático de trámites cuando el servicio lo permite.
+
+Ollama ayuda a redactar reportes y conclusiones sin depender de servicios externos de IA.
+
+El RAG ayuda a que las respuestas se basen en información documentada del proyecto.
+
+La combinación de API externa, reportes e IA local permite reducir trabajo manual, mejorar trazabilidad y dejar evidencia del proceso.
+
+---
+
+Pregunta frecuente: ¿Está justificado el uso de IA en Soluciones Edgar?
+
+Sí. La IA está justificada porque apoya al administrador con explicaciones del sistema, búsqueda contextual en la base de conocimiento, análisis de pedidos, generación de reportes y resúmenes administrativos. La automatización real de trámites se maneja con API externa, mientras que la IA ayuda a interpretar, resumir y documentar el proceso.
+
+---
+
+## 24. FLUJO COMPLETO DEL SISTEMA
+
+1. El usuario inicia sesión.
+2. El usuario consulta los servicios disponibles.
+3. El usuario solicita un trámite.
+4. El sistema guarda el pedido con usuario, servicio e input_data.
+5. El sistema valida saldo.
+6. Si hay saldo suficiente, descuenta el saldo y registra una transacción purchase.
+7. Si el servicio es manual, queda para revisión del administrador.
+8. Si el servicio es automático, se despacha ProcessExternalOrderJob.
+9. El Job usa ExternalOrderAutomationService.
+10. Si el proveedor es dhru, se usa DhruApiService.
+11. En simulación se genera una orden SIM y un archivo de resultado.
+12. El pedido se marca como completed y processed_by_api si terminó correctamente.
+13. El usuario o administrador descarga el resultado.
+14. El administrador puede generar un reporte de cierre.
+15. Ollama puede redactar el resumen final del reporte.
+
+---
+
+Pregunta frecuente: ¿Cuál es el flujo completo de un trámite automático?
+
+El usuario solicita un servicio, el sistema crea el pedido, guarda input_data, valida y descuenta saldo, revisa si el servicio es automatic, despacha ProcessExternalOrderJob, procesa con ExternalOrderAutomationService, usa DhruApiService si el proveedor es dhru, genera o recibe el resultado, actualiza api_status, guarda api_report, marca processed_by_api y permite descargar el archivo desde el pedido.
+
+---
+
+## 25. ESTADO ACTUAL DEL PROYECTO
+
+El proyecto ya tiene una IA local conectada al panel administrativo.
+
+El RAG funciona con ChromaDB y Ollama.
+
+El sistema puede responder preguntas sobre servicios, estados de pedidos, saldo, tecnologías, recursos de Filament y procesamiento de pedidos.
+
+El sistema tiene procesamiento por API externa en modo simulación.
+
+El sistema puede marcar pedidos como procesados por API externa.
+
+El sistema puede generar archivos de resultado simulados.
+
+El sistema puede generar reportes de cierre con resumen final usando Ollama.
+
+El sistema está preparado para conectar un proveedor real cuando se tengan credenciales, API activa y documentación oficial del proveedor.
 
 ---
 
 FIN DEL DOCUMENTO DE CONOCIMIENTO
-Soluciones Edgar — Base de conocimiento para sistema RAG
-Versión 3.0 — Mayo 2026
+Soluciones Edgar — Base de conocimiento optimizada para sistema RAG
+Versión 4.0 — Mayo 2026

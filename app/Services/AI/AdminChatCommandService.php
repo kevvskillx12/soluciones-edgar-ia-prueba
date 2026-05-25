@@ -21,7 +21,7 @@ class AdminChatCommandService
             return null;
         }
 
-        $messageLower = Str::lower($message);
+        $messageLower = Str::lower(Str::ascii($message));
 
         // 1. Comando: Generar Reporte de Cierre (Existente)
         $reportKeywords = [
@@ -29,7 +29,9 @@ class AdminChatCommandService
             'generar reporte de trámites', 'generar reporte de tramites',
             'generar reporte de pedidos', 'reporte de cierre',
             'reporte de servicios procesados', 'últimos pedidos',
-            'ultimos pedidos'
+            'ultimos pedidos', 'ultimo tramite', 'ultimo pedido',
+            'del ultimo tramite', 'del ultimo pedido',
+            'de el ultimo tramite', 'de el ultimo pedido'
         ];
         if (Str::contains($messageLower, $reportKeywords)) {
             return $this->generateReport($messageLower);
@@ -80,6 +82,11 @@ class AdminChatCommandService
                 return min($parsed, $max);
             }
         }
+        
+        if (Str::contains($message, ['ultimo', 'último'])) {
+            return 1;
+        }
+
         return $default;
     }
 
@@ -101,7 +108,11 @@ class AdminChatCommandService
         $publicUrl = Storage::disk('public')->url($result['file_path']);
 
         $respuestaTexto = "✅ **Reporte generado correctamente.**\n";
-        $respuestaTexto .= "Se incluyeron los últimos {$orders->count()} trámites.\n";
+        if ($orders->count() === 1) {
+            $respuestaTexto .= "Se incluyó el último trámite.\n";
+        } else {
+            $respuestaTexto .= "Se incluyeron los últimos {$orders->count()} trámites.\n";
+        }
         $respuestaTexto .= "Descargar archivo: [{$result['file_path']}]({$publicUrl})\n\n";
         $respuestaTexto .= "**Resumen Final:**\n" . $result['summary'];
 
