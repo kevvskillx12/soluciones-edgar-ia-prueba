@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 Route::get('/', function () {
     if (auth()->check()) {
@@ -78,14 +79,16 @@ Route::post('/ia-test', function () {
         $scriptPath = base_path('rag/rag_bridge.py');
 
         if (!file_exists($pythonPath)) {
+            Log::error('RAG: No se encuentra el interprete Python', ['path' => $pythonPath]);
             return response()->json([
-                'respuesta' => 'ERROR: No existe python.exe en esta ruta: ' . $pythonPath
+                'respuesta' => 'ERROR: El sistema RAG no está configurado correctamente (Python no encontrado).'
             ], 200, [], JSON_UNESCAPED_UNICODE);
         }
 
         if (!file_exists($scriptPath)) {
+            Log::error('RAG: No se encuentra rag_bridge.py', ['path' => $scriptPath]);
             return response()->json([
-                'respuesta' => 'ERROR: No existe rag_bridge.py en esta ruta: ' . $scriptPath
+                'respuesta' => 'ERROR: El sistema RAG no está configurado correctamente (script no encontrado).'
             ], 200, [], JSON_UNESCAPED_UNICODE);
         }
 
@@ -96,9 +99,9 @@ Route::post('/ia-test', function () {
         $output = shell_exec($command);
 
         if ($output === null) {
+            Log::error('RAG: shell_exec devolvió null', ['comando' => $command]);
             return response()->json([
-                'respuesta' => 'ERROR: shell_exec devolvió null. Puede estar deshabilitado en PHP o no pudo ejecutar el comando.',
-                'comando' => $command
+                'respuesta' => 'ERROR: No se pudo ejecutar el script Python. Contacta al administrador.'
             ], 200, [], JSON_UNESCAPED_UNICODE);
         }
 
@@ -108,9 +111,16 @@ Route::post('/ia-test', function () {
         $data = json_decode($output, true);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
+            Log::error('RAG: salida no es JSON válido', ['output' => $output, 'comando' => $command]);
             return response()->json([
-                'respuesta' => 'ERROR: La salida del RAG no es JSON válido. Salida recibida: ' . $output,
-                'comando' => $command
+                'respuesta' => 'ERROR: El sistema RAG respondió con un formato inválido. Intenta de nuevo.'
+            ], 200, [], JSON_UNESCAPED_UNICODE);
+        }
+
+        if (isset($data['success']) && $data['success'] === false) {
+            Log::error('RAG: error reportado por Python', ['error' => $data['error'] ?? 'desconocido', 'pregunta' => $pregunta]);
+            return response()->json([
+                'respuesta' => 'ERROR: ' . ($data['error'] ?? 'Error desconocido en el RAG.')
             ], 200, [], JSON_UNESCAPED_UNICODE);
         }
 
@@ -122,14 +132,15 @@ Route::post('/ia-test', function () {
             ], 200, [], JSON_UNESCAPED_UNICODE);
         }
 
+        Log::error('RAG: JSON sin clave respuesta', ['output' => $output]);
         return response()->json([
-            'respuesta' => 'ERROR: El RAG respondió JSON, pero no contiene la clave respuesta. Salida: ' . $output,
-            'comando' => $command
+            'respuesta' => 'ERROR: El RAG respondió pero no se pudo extraer la respuesta. Intenta de nuevo.'
         ], 200, [], JSON_UNESCAPED_UNICODE);
 
     } catch (\Throwable $e) {
+        Log::error('RAG: excepción PHP en /ia-test', ['error' => $e->getMessage()]);
         return response()->json([
-            'respuesta' => 'ERROR PHP en /ia-test: ' . $e->getMessage()
+            'respuesta' => 'ERROR: Ocurrió un problema interno. Intenta de nuevo más tarde.'
         ], 200, [], JSON_UNESCAPED_UNICODE);
     }
 });
