@@ -1,7 +1,10 @@
 """
 Script de Metricas RAG — Soluciones Edgar
-Actualizado para documento v3.0
-Evalua: Precision, Recall, Fidelidad y Relevancia
+Actualizado para documento v4.0
+Evalua: Precision, Recall, Fidelidad, Relevancia y Latencia
+Nota: Son metricas heuristicas (no RAGAS). Miden la capacidad del
+sistema para recuperar fragmentos relevantes y generar respuestas
+basadas en el contexto recuperado.
 """
 
 import chromadb
@@ -14,31 +17,40 @@ COLECCION   = 'soluciones_edgar'
 OLLAMA_URL  = 'http://localhost:11434/api/generate'
 MODELO      = 'llama3.2:1b'
 
-# Preguntas actualizadas con las respuestas exactas del documento v3.0
+# Preguntas actualizadas con las respuestas exactas del documento v4.0
+# Cubren: servicios, estados de pedido, saldo, depositos, admin, descarga, justificacion IA
 PREGUNTAS_PRUEBA = [
+    {
+        "pregunta" : "Que servicios ofrece Soluciones Edgar?",
+        "esperado" : "actas sat imss infonavit vehiculos generales nacimiento defuncion divorcio matrimonio"
+    },
     {
         "pregunta" : "Cuales son los estados de un pedido?",
         "esperado" : "pending processing completed rejected"
     },
     {
-        "pregunta" : "Que tecnologias usa el sistema?",
-        "esperado" : "laravel php eloquent filament livewire ollama migrations seeders"
-    },
-    {
-        "pregunta" : "Que servicios ofrece el sistema?",
-        "esperado" : "actas sat imss infonavit vehiculos generales"
-    },
-    {
         "pregunta" : "Como funciona el saldo del usuario?",
-        "esperado" : "balance credit addBalance subtractBalance deposit purchase refund"
+        "esperado" : "balance credit addBalance subtractBalance deposit purchase"
     },
     {
-        "pregunta" : "Cuanto es el deposito minimo?",
-        "esperado" : "300 pesos minimo deposito"
+        "pregunta" : "Como se aprueba un deposito?",
+        "esperado" : "depositrequestresource approved pending rejected banco comprobante"
     },
     {
-        "pregunta" : "Como se identifica a un administrador?",
-        "esperado" : "is_admin true administrador campo"
+        "pregunta" : "Que puede hacer el administrador?",
+        "esperado" : "is_admin admin filament panel usuarios servicios pedidos depositos"
+    },
+    {
+        "pregunta" : "Como se descarga el resultado de un tramite?",
+        "esperado" : "result_file_path download orders 403 404"
+    },
+    {
+        "pregunta" : "Por que esta justificado el uso de IA en el sistema?",
+        "esperado" : "justificado asistente administrativo reportes resumenes ollama local"
+    },
+    {
+        "pregunta" : "Que tecnologias usa el sistema?",
+        "esperado" : "laravel php eloquent filament livewire ollama chromadb python"
     },
     {
         "pregunta" : "Que tipos de transacciones existen?",
@@ -99,7 +111,8 @@ def calcular_relevancia(respuesta, pregunta):
 
 if __name__ == '__main__':
     print("\n" + "="*60)
-    print("  EVALUACION DE METRICAS RAG — SOLUCIONES EDGAR v3.0")
+    print("  EVALUACION DE METRICAS RAG — SOLUCIONES EDGAR v4.0")
+    print("  (Metricas heuristicas — no RAGAS)")
     print("="*60)
 
     try:

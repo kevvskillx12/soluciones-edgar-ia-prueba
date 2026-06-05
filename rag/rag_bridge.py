@@ -16,9 +16,14 @@ if hasattr(sys.stdout, "reconfigure"):
 CHROMA_PATH = os.path.join(os.path.dirname(__file__), "chroma_db")
 COLECCION = "soluciones_edgar"
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODELO = "llama3.2:1b"
+OLLAMA_TIMEOUT = 120
 
-# Recupera más fragmentos para darle más contexto al modelo.
+# Modelo configurable via variable de entorno OLLAMA_MODEL
+# Valor por defecto: llama3.2:1b (compatible con CPU)
+# Recomendado: llama3.2:3b (si hay suficiente RAM/GPU)
+MODELO = os.environ.get("OLLAMA_MODEL", "llama3.2:1b")
+
+# Recupera mas fragmentos para darle mas contexto al modelo.
 TOP_K = 12
 
 
@@ -254,7 +259,7 @@ RESPUESTA:
                     "num_predict": 350
                 }
             },
-            timeout=120
+            timeout=OLLAMA_TIMEOUT
         )
 
         if r.status_code == 200:
@@ -265,15 +270,19 @@ RESPUESTA:
 
             return respuesta
 
-        return "Error al consultar Ollama."
+        return f"Error al consultar Ollama (status {r.status_code})."
 
+    except requests.exceptions.Timeout:
+        return "Error: La consulta a Ollama excedio el tiempo de espera."
+    except requests.exceptions.ConnectionError:
+        return "Error: No se pudo conectar con Ollama. Verifica que Ollama este corriendo en localhost:11434."
     except Exception as e:
-        return f"Error: {e}"
+        return f"Error interno: {e}"
 
 
 def main():
     if len(sys.argv) < 2:
-        print(json.dumps({"error": "No se proporcionó pregunta"}, ensure_ascii=False))
+        print(json.dumps({"success": False, "error": "No se proporcionó pregunta"}, ensure_ascii=False))
         sys.exit(1)
 
     pregunta = sys.argv[1]
@@ -283,26 +292,28 @@ def main():
         directa = respuesta_directa_si_aplica(pregunta)
 
         if directa:
-            print(json.dumps({"respuesta": directa}, ensure_ascii=False))
+            print(json.dumps({"success": True, "respuesta": directa}, ensure_ascii=False))
             sys.exit(0)
 
         resultado_busqueda = buscar_contexto(pregunta)
         fragmentos = resultado_busqueda["documents"]
         distancias = resultado_busqueda["distances"]
-        
+
         respuesta = consultar_ollama(pregunta, fragmentos)
 
         if debug_mode:
             print(json.dumps({
+                "success": True,
                 "respuesta": respuesta,
                 "fragmentos_recuperados": fragmentos,
                 "distancias": distancias
             }, ensure_ascii=False, indent=2))
         else:
-            print(json.dumps({"respuesta": respuesta}, ensure_ascii=False))
+            print(json.dumps({"success": True, "respuesta": respuesta}, ensure_ascii=False))
 
     except Exception as e:
         print(json.dumps({
+            "success": False,
             "respuesta": "No tengo informacion sobre eso en mi base de conocimiento.",
             "error": str(e)
         }, ensure_ascii=False))

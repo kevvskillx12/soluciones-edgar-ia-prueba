@@ -29,7 +29,7 @@ print(f"\n[1/4] Leyendo documento: {DOCUMENTO_PATH}")
 with open(DOCUMENTO_PATH, 'r', encoding='utf-8') as f:
     texto_completo = f.read()
 
-print(f"      Documento cargado: {len(texto_completo)} caracteres")
+print(f"      Documento cargado: {len(texto_completo)} caracteres totales")
 
 # =============================================
 # PASO 2: LIMPIEZA DEL TEXTO
@@ -52,7 +52,7 @@ for linea in lineas:
     lineas_limpias.append(linea)
 
 texto_limpio = '\n'.join(lineas_limpias)
-print(f"      Texto limpio: {len(texto_limpio)} caracteres")
+print(f"      Texto limpio: {len(texto_limpio)} caracteres utiles")
 
 # =============================================
 # PASO 3: CHUNKING (FRAGMENTACION)
@@ -144,15 +144,8 @@ for i in range(0, len(chunks), LOTE):
     lote_metadatos = metadatos[i:i+LOTE]
 
     coleccion.add(
-        documents=lote_ids,
-        ids=lote_ids,
-        metadatas=lote_metadatos
-    )
-
-    # Guardar texto real por separado usando upsert con embeddings
-    coleccion.upsert(
-        ids=lote_ids,
         documents=lote_chunks,
+        ids=lote_ids,
         metadatas=lote_metadatos
     )
 
@@ -169,12 +162,15 @@ print("\n" + "=" * 55)
 print("  INGESTA COMPLETADA EXITOSAMENTE")
 print("=" * 55)
 print(f"  Documento procesado : conocimiento_soluciones_edgar.txt")
+print(f"  Total caracteres    : {len(texto_completo)}")
+print(f"  Caracteres utiles   : {len(texto_limpio)}")
 print(f"  Fragmentos totales  : {len(chunks)}")
 print(f"  Tamano de chunk     : {CHUNK_SIZE} caracteres")
 print(f"  Solapamiento        : {CHUNK_OVERLAP} caracteres")
 print(f"  Base de datos       : {CHROMA_PATH}")
 print(f"  Coleccion           : {COLECCION}")
 print(f"  Metrica de distancia: coseno (cosine similarity)")
+print(f"  Fragmentos en BD    : {total}")
 print("=" * 55)
 print("\n  Siguiente paso: ejecutar rag_query.py")
 print("  para hacer consultas al sistema RAG.\n")

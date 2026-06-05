@@ -1,0 +1,36 @@
+PREGUNTAS RECOMENDADAS PARA GRABAR EVIDENCIA
+==============================================
+Sistema RAG — Soluciones Edgar
+
+Estas preguntas cubren los temas principales del documento de conocimiento.
+Se recomienda probarlas en el chat (/ia-chat o /ia-test) y grabar las respuestas.
+
+1. ¿Qué servicios ofrece Soluciones Edgar?
+   - Debería responder con la lista de servicios: actas, SAT, IMSS, Infonavit, etc.
+
+2. ¿Cómo funciona el saldo del usuario?
+   - Debería explicar balance, credit, addBalance, subtractBalance, purchase.
+
+3. ¿Cuáles son los estados de un pedido?
+   - Debería responder: pending, processing, completed, rejected.
+
+4. ¿Cómo se aprueba un depósito?
+   - Debería explicar DepositRequestResource, estados pending/approved/rejected.
+
+5. ¿Qué puede hacer el administrador?
+   - Debería mencionar is_admin, panel Filament, gestión de usuarios/servicios/pedidos/depósitos.
+
+6. ¿Cómo se descarga el resultado de un trámite?
+   - Debería explicar result_file_path, ruta /app/orders/{order}/download.
+
+7. ¿Por qué está justificado el uso de IA en el sistema?
+   - Debería explicar que la IA es asistente administrativo, no reemplaza la lógica del sistema.
+
+8. ¿Qué tecnologías usa el sistema?
+   - Debería listar Laravel, PHP, Filament, ChromaDB, Ollama, etc.
+
+9. ¿Qué hace OrderResource?
+   - Debería explicar que administra pedidos en Filament.
+
+10. ¿Qué es RAG en este proyecto?
+    - Debería explicar Retrieval-Augmented Generation con ChromaDB y Ollama.
