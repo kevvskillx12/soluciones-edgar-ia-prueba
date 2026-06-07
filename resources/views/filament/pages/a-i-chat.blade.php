@@ -194,6 +194,29 @@
         max-width: 680px;
         margin: 10px auto 0;
     }
+    .gpt-download-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        background: #19c37d;
+        color: #000;
+        font-weight: 600;
+        font-size: 14px;
+        border-radius: 10px;
+        text-decoration: none;
+        transition: background 0.15s, transform 0.1s;
+        margin: 6px 0;
+        cursor: pointer;
+        border: none;
+    }
+    .gpt-download-btn:hover {
+        background: #15a067;
+        color: #000;
+    }
+    .gpt-download-btn:active {
+        transform: scale(0.96);
+    }
 </style>
 @endpush
 
@@ -274,7 +297,7 @@
 
             const msg    = document.createElement('div');
             msg.className = 'gpt-msg';
-            msg.textContent = text;
+            msg.innerHTML = text.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
 
             right.appendChild(sender);
             right.appendChild(msg);

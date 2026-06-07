@@ -1,0 +1,152 @@
+=========================================================
+ PRUEBAS MANUALES: COMANDOS ADMINISTRATIVOS DEL CHAT IA
+=========================================================
+Proyecto: Soluciones Edgar
+Fecha: 2026-06-05
+
+Instrucciones:
+1. Inicia sesión como administrador en /admin
+2. Abre el chat en /ia-chat o en el panel administrativo
+3. Copia y pega cada pregunta, una por una
+4. Verifica el resultado esperado
+
+=========================================================
+ PRUEBA 1: Reporte de Cierre
+=========================================================
+Pregunta: "reporte de cierre"
+Resultado esperado:
+- El sistema responde "Reporte generado correctamente"
+- Incluye un enlace como http://127.0.0.1:8000/storage/reports/reporte-cierre-pedidos-*.txt
+- El enlace DEBE abrir el archivo en el navegador
+- Si no abre: ejecuta "php artisan storage:link"
+
+=========================================================
+ PRUEBA 2: Reporte del Último Trámite
+=========================================================
+Pregunta: "genera un reporte del último trámite"
+Resultado esperado:
+- Genera reporte con solo 1 trámite (el más reciente)
+- El enlace debe abrir en el navegador
+
+=========================================================
+ PRUEBA 3: Crear Trámite (Todos los datos)
+=========================================================
+Pregunta: "Crea un trámite de Acta de Nacimiento para Luis Alfonso con CURP EXPL050202HYNKCSA0"
+Resultado esperado:
+- Crea el pedido REAL en la base de datos
+- Responde: "Pedido creado correctamente. ID: #N..."
+- NO debe dar instrucciones inventadas
+- Verificar en /admin/orders que el pedido existe
+
+=========================================================
+ PRUEBA 4: Crear Trámite de CURP
+=========================================================
+Pregunta: "Crea un trámite de CURP para Ana López con CURP LOAA010203MYNPRA09"
+Resultado esperado:
+- Busca el servicio "CURP Actualizada" por alias
+- Crea el pedido real
+- Responde confirmación
+
+=========================================================
+ PRUEBA 5: Crear Trámite (Servicio Inexistente)
+=========================================================
+Pregunta: "Crea un trámite de ServicioInexistente123 para Luis Alfonso"
+Resultado esperado:
+- Responde: "No encontré un servicio llamado..."
+- Sugiere servicios similares disponibles
+
+=========================================================
+ PRUEBA 6: Crear Trámite (Sin datos suficientes)
+=========================================================
+Pregunta: "Crea un trámite"
+Resultado esperado:
+- Pide que especifiques el servicio
+- Ejemplo: "No entendí qué servicio deseas crear..."
+
+=========================================================
+ PRUEBA 7: Crear Trámite (Sin usuario)
+=========================================================
+Pregunta: "Crea un trámite de Acta de Nacimiento"
+Resultado esperado:
+- Si no encuentra usuario, pide que especifiques el usuario
+- Muestra usuarios disponibles
+
+=========================================================
+ PRUEBA 8: Pedidos Fallidos
+=========================================================
+Pregunta: "pedidos fallidos"
+Resultado esperado:
+- Si hay fallidos: lista los pedidos con error
+- Si no hay: "No se encontraron pedidos fallidos"
+
+=========================================================
+ PRUEBA 9: Pedidos Pendientes
+=========================================================
+Pregunta: "pedidos pendientes"
+Resultado esperado:
+- Lista pedidos en estado pending
+- O "No hay pedidos pendientes en este momento"
+
+=========================================================
+ PRUEBA 10: Revisión Manual
+=========================================================
+Pregunta: "revisión manual"
+Resultado esperado:
+- Lista pedidos en revisión manual o pending
+- O mensaje de que no hay
+
+=========================================================
+ PRUEBA 11: Completados Hoy
+=========================================================
+Pregunta: "completados hoy"
+Resultado esperado:
+- Muestra resumen de completados del día
+- O "Aún no hay pedidos completados"
+
+=========================================================
+ PRUEBA 12: Consultar Servicios
+=========================================================
+Pregunta: "qué servicios hay"
+Resultado esperado:
+- Lista todos los servicios disponibles
+
+=========================================================
+ PRUEBA 13: Consultar Usuario
+=========================================================
+Pregunta: "consultar usuario luis@test.com"
+Resultado esperado:
+- Muestra datos del usuario
+- O "No encontré el usuario" si no existe
+
+=========================================================
+ PRUEBA 14: Crear Trámite con NSS
+=========================================================
+Pregunta: "Crea un trámite de Localizar NSS para María Torres con NSS 12345678901"
+Resultado esperado:
+- Busca servicio "Localizar NSS con CURP" por alias
+- Crea pedido real
+- Guarda NSS en input_data
+
+=========================================================
+ PRUEBA 15: Crear Trámite con RFC
+=========================================================
+Pregunta: "Crea un trámite de CSF para Juan Pérez con RFC PEJJ010203AB1"
+Resultado esperado:
+- Busca CSF por alias
+- Crea pedido real si encuentra usuario
+
+=========================================================
+VALIDACIÓN ADICIONAL
+=========================================================
+
+# Verificar que el symlink existe
+ls -la public/storage
+
+# Verificar reportes generados
+ls -la storage/app/public/reports/
+
+# Verificar pedidos creados desde chat
+php artisan tinker --execute="\App\Models\Order::where('input_data->creado_por_chat', true)->get()->each(fn(\$o) => print('Pedido #'.$o->id.' | '.$o->service->name.' | '.$o->user->name.PHP_EOL));"
+
+# Probar acceso a reporte (reemplazar NNNN con el nombre real)
+curl -I http://127.0.0.1:8000/storage/reports/reporte-cierre-pedidos-*.txt

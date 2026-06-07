@@ -4,6 +4,7 @@ namespace App\Services\Reports;
 
 use App\Services\AI\OllamaReportService;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class OrderClosingReportService
@@ -113,8 +114,31 @@ Error: {$apiError}";
         $content .= "NOTA:\n";
         $content .= "Este reporte fue generado con datos del sistema. El resumen final fue redactado con apoyo de IA local mediante Ollama. Si Ollama no está disponible, el sistema genera un resumen básico automáticamente.\n";
 
+        // Validar que el directorio exista
+        $reportsDir = storage_path('app/public/reports');
+        if (!is_dir($reportsDir)) {
+            mkdir($reportsDir, 0755, true);
+        }
+
         // Guardar archivo
-        Storage::disk('public')->put($path, $content);
+        $saved = Storage::disk('public')->put($path, $content);
+
+        if (!$saved) {
+            Log::error('[OrderClosingReportService] No se pudo guardar el archivo de reporte', [
+                'path' => $path,
+                'absolute_path' => Storage::disk('public')->path($path),
+            ]);
+            throw new \RuntimeException('No se pudo guardar el archivo de reporte en ' . $path);
+        }
+
+        $absolutePath = Storage::disk('public')->path($path);
+        if (!file_exists($absolutePath)) {
+            Log::error('[OrderClosingReportService] El archivo no existe después de guardarlo', [
+                'path' => $path,
+                'absolute_path' => $absolutePath,
+            ]);
+            throw new \RuntimeException('El archivo de reporte no se encuentra después de generarlo.');
+        }
 
         return [
             'success' => true,
@@ -123,7 +147,7 @@ Error: {$apiError}";
             'details' => $content,
             'file_path' => $path,
             'generated_at' => now()->toDateTimeString(),
-            'absolute_path' => Storage::disk('public')->path($path),
+            'absolute_path' => $absolutePath,
         ];
     }
 }
