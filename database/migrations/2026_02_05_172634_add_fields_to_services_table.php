@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -11,9 +12,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-        \Illuminate\Support\Facades\DB::table('services')->truncate();
-        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        } else {
+            Schema::disableForeignKeyConstraints();
+        }
+        
+        DB::table('services')->truncate();
+        
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        } else {
+            Schema::enableForeignKeyConstraints();
+        }
 
         Schema::table('services', function (Blueprint $table) {
             $table->string('code')->unique()->after('id');
