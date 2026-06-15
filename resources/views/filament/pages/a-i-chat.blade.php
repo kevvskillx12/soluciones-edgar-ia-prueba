@@ -234,6 +234,7 @@
         const errorEl    = document.getElementById('gpt-error');
 
         let loading = false;
+        let conversationId = localStorage.getItem('ai_conversation_id') || null;
 
         promptEl.addEventListener('input', function () {
             this.style.height = 'auto';
@@ -331,7 +332,10 @@
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
-                    body: JSON.stringify({ pregunta: text })
+                    body: JSON.stringify({
+                        pregunta: text,
+                        conversation_id: conversationId,
+                    })
                 });
 
                 removeTyping();
@@ -339,6 +343,17 @@
                 if (!res.ok) throw new Error('Error del servidor (' + res.status + ')');
 
                 const data = await res.json();
+
+                if (data.conversation_id) {
+                    conversationId = data.conversation_id;
+                    localStorage.setItem('ai_conversation_id', conversationId);
+                }
+
+                // Si el backend indicó que la conversación fue completada, limpiar el conversation_id guardado
+                if (data.metadata && (data.metadata.reset_conversation || data.metadata.conversation_completed)) {
+                    conversationId = null;
+                    localStorage.removeItem('ai_conversation_id');
+                }
 
                 if (data.respuesta) {
                     addRow('ai', data.respuesta);

@@ -13,7 +13,12 @@ class ConversationMemoryService
         if ($conversationId) {
             $conversation = AiConversation::with('messages')->where('conversation_id', $conversationId)->first();
             if ($conversation) {
-                return $conversation;
+                $metadata = $conversation->metadata ?? [];
+                if (isset($metadata['status']) && $metadata['status'] === 'completed') {
+                    // Ignore completed conversations: start a fresh one
+                } else {
+                    return $conversation;
+                }
             }
         }
 

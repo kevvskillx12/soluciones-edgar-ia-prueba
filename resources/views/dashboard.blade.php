@@ -39,6 +39,8 @@
 
     <!-- ⚡ SCRIPT DE IA -->
     <script>
+    let aiConversationId = localStorage.getItem('ai_conversation_id') || null;
+
     async function sendAI() {
         const prompt = document.getElementById('prompt').value;
 
@@ -48,10 +50,24 @@
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': '{{ csrf_token() }}'
             },
-            body: JSON.stringify({ pregunta: prompt })
+            body: JSON.stringify({
+                pregunta: prompt,
+                conversation_id: aiConversationId,
+            })
         });
 
         const data = await res.json();
+
+        if (data.conversation_id) {
+            aiConversationId = data.conversation_id;
+            localStorage.setItem('ai_conversation_id', aiConversationId);
+        }
+
+        // Si el backend indicó que la conversación fue completada, limpiar el conversation_id guardado
+        if (data.metadata && (data.metadata.reset_conversation || data.metadata.conversation_completed)) {
+            aiConversationId = null;
+            localStorage.removeItem('ai_conversation_id');
+        }
 
         document.getElementById('respuesta').innerText = data.respuesta;
     }
