@@ -49,25 +49,49 @@ class ConversationMemoryService
         ]);
     }
 
-    public function getPromptBuffer(AiConversation $conversation, int $maxMessages = 20): array
+    public function getPromptBuffer(AiConversation $conversation, int $maxTokens = 4000): array
     {
         $messages = $conversation->messages()
-            ->orderBy('created_at', 'desc')
-            ->limit($maxMessages)
-            ->get()
-            ->reverse()
-            ->values();
+            ->orderBy('id', 'desc')
+            ->limit(50)
+            ->get();
 
         $buffer = [];
+        $currentTokens = 0;
+
+        if ($conversation->summary) {
+            $systemPromptTokens = $this->estimateTokens("Resumen de la conversación: {$conversation->summary}");
+            $currentTokens += $systemPromptTokens;
+        }
+
+        $messagesToInclude = [];
+        foreach ($messages as $message) {
+            $msgTokens = $message->token_estimate ?? $this->estimateTokens($message->content);
+            if ($currentTokens + $msgTokens <= $maxTokens || empty($messagesToInclude)) {
+                $messagesToInclude[] = $message;
+                $currentTokens += $msgTokens;
+            } else {
+                break;
+            }
+        }
+
+        $messagesToInclude = array_reverse($messagesToInclude);
 
         if ($conversation->summary) {
             $buffer[] = ['role' => 'system', 'content' => "Resumen de la conversación: {$conversation->summary}"];
         }
 
-        foreach ($messages as $message) {
+        foreach ($messagesToInclude as $message) {
+            $content = $message->content;
+            
+            // Prevención de State Poisoning: Si una herramienta falló, agregamos una instrucción segura.
+            if ($message->role === 'tool' && isset($message->metadata['tool_status']) && $message->metadata['tool_status'] === 'error') {
+                $content .= "\n\n[SYSTEM LOG]: La herramienta falló. Por favor, informa al usuario sobre el problema y no intentes llamar a esta herramienta de nuevo con los mismos parámetros.";
+            }
+
             $buffer[] = [
                 'role' => $message->role,
-                'content' => $message->content,
+                'content' => $content,
             ];
         }
 
@@ -82,15 +106,14 @@ class ConversationMemoryService
     public function shouldSummarize(AiConversation $conversation): bool
     {
         $totalTokens = $conversation->messages()->sum('token_estimate') ?? 0;
-        return $totalTokens > 1000;
+        return $totalTokens > 8000;
     }
 
     public function updateSummary(AiConversation $conversation): void
     {
         $messages = $conversation->messages()
-            ->where('role', 'user')
-            ->orWhere('role', 'assistant')
-            ->orderBy('created_at', 'desc')
+            ->whereIn('role', ['user', 'assistant'])
+            ->orderBy('id', 'desc')
             ->limit(10)
             ->get()
             ->reverse();
@@ -168,7 +191,7 @@ class ConversationMemoryService
         });
 
         if ($lastUserMessage) {
-            return 'Última pregunta del usuario: ' . substr($lastUserMessage['content'], 0, 200) . '...';
+            return 'Última pregunta del usuario: ' . mb_substr($lastUserMessage['content'], 0, 200) . '...';
         }
 
         return 'Resumen de conversación truncado';

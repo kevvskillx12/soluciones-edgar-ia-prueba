@@ -27,6 +27,13 @@ class AppServiceProvider extends ServiceProvider
             \Filament\Http\Responses\Auth\Contracts\RegistrationResponse::class,
             \App\Http\Responses\RegistrationResponse::class
         );
+
+        // Bind RAG bridge interface to the real Python implementation.
+        // Tests can swap this with app()->instance(RagBridgeService::class, $fake).
+        $this->app->singleton(
+            \App\Services\AI\RagBridgeService::class,
+            \App\Services\AI\PythonRagBridgeService::class
+        );
     }
 
     /**

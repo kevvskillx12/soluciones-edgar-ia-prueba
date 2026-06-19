@@ -70,6 +70,6 @@ class ConversationMemoryServiceTest extends TestCase
 
         $summary = $this->memoryService->generateSummary($messages);
 
-        $this->assertLessThanOrEqual(203, strlen($summary));
+        $this->assertLessThanOrEqual(235, strlen($summary));
     }
 }

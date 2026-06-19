@@ -243,28 +243,27 @@ RESPUESTA EN ESPAÑOL:
             json={
                 "model": MODELO,
                 "prompt": prompt,
-                "stream": False,
+                "stream": True,
                 "options": {
                     "temperature": 0.0,
                     "num_predict": 350,
                     "top_p": 0.3
                 }
             },
-            timeout=120
+            timeout=120,
+            stream=True
         )
 
-        if r.status_code == 200:
-            respuesta = r.json().get("response", "").strip()
+        r.raise_for_status()
 
-            if not respuesta:
-                return "No tengo informacion sobre eso en mi base de conocimiento."
-
-            return respuesta
-
-        return "Error al consultar Ollama."
+        for line in r.iter_lines():
+            if line:
+                chunk = json.loads(line)
+                if "response" in chunk:
+                    print(json.dumps({"token": chunk["response"]}, ensure_ascii=False), flush=True)
 
     except Exception as e:
-        return f"Error: {e}"
+        print(json.dumps({"error": str(e)}, ensure_ascii=False), flush=True)
 
 
 def main():
@@ -282,9 +281,13 @@ def main():
             sys.exit(0)
 
         fragmentos = buscar_contexto(pregunta)
-        respuesta = consultar_ollama(pregunta, fragmentos)
+        
+        # Emite un evento especial de SEARCHING/CONTEXT_FOUND (Fase 3 UI states)
+        print(json.dumps({"status": "SEARCHING", "context_found": len(fragmentos) > 0}), flush=True)
 
-        print(json.dumps({"respuesta": respuesta}, ensure_ascii=False))
+        consultar_ollama(pregunta, fragmentos)
+        
+        print(json.dumps({"status": "COMPLETED"}), flush=True)
 
     except Exception as e:
         print(json.dumps({

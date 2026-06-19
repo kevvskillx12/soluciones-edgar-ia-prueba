@@ -215,6 +215,13 @@
     <div id="gpt-input-bar">
         <div id="gpt-error"></div>
         <div class="gpt-input-wrap">
+            <button id="gpt-mic" title="Dictar por voz" onclick="toggleMic()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    <line x1="12" y1="19" x2="12" y2="22"/>
+                </svg>
+            </button>
             <textarea id="gpt-prompt" placeholder="Pregunta lo que quieras" rows="1"></textarea>
             <button id="gpt-send" onclick="gptSend()" title="Enviar">
                 <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -222,6 +229,7 @@
                 </svg>
             </button>
         </div>
+        <div id="gpt-status-text" style="text-align: center; font-size: 11px; color: #888; margin-top: 5px; height: 16px;"></div>
         <p class="gpt-footer-note">El asistente puede cometer errores. Verifica la información importante.</p>
     </div>
 
@@ -232,6 +240,8 @@
         const promptEl   = document.getElementById('gpt-prompt');
         const sendBtn    = document.getElementById('gpt-send');
         const errorEl    = document.getElementById('gpt-error');
+        const statusEl   = document.getElementById('gpt-status-text');
+        const micBtn     = document.getElementById('gpt-mic');
 
         let loading = false;
         let conversationId = localStorage.getItem('ai_conversation_id') || null;
@@ -253,52 +263,40 @@
             if (el) el.remove();
         }
 
-        function addRow(type, text) {
+        function setStatus(text) {
+            statusEl.textContent = text;
+        }
+
+        function createRow(type) {
             clearEmpty();
-
-            const row    = document.createElement('div');
+            const row = document.createElement('div');
             row.className = 'gpt-row ' + type;
-
-            const inner  = document.createElement('div');
+            const inner = document.createElement('div');
             inner.className = 'gpt-row-inner';
-
             const avatar = document.createElement('div');
             avatar.className = 'gpt-avatar ' + type;
             avatar.textContent = type === 'user' ? 'Tú' : '✦';
-
-            const right  = document.createElement('div');
+            const right = document.createElement('div');
             right.style.flex = '1';
-
             const sender = document.createElement('div');
             sender.className = 'gpt-sender';
             sender.textContent = type === 'user' ? 'Tú' : 'Asistente';
-
-            const msg    = document.createElement('div');
+            const msg = document.createElement('div');
             msg.className = 'gpt-msg';
-            msg.textContent = text;
-
+            
             right.appendChild(sender);
             right.appendChild(msg);
             inner.appendChild(avatar);
             inner.appendChild(right);
             row.appendChild(inner);
             messagesEl.appendChild(row);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
+            return msg;
         }
 
-        function addTyping() {
-            clearEmpty();
-            const row    = document.createElement('div');
-            row.className = 'gpt-row ai';
-            row.id       = 'gpt-typing';
-            row.innerHTML = '<div class="gpt-row-inner"><div class="gpt-avatar ai">✦</div><div style="flex:1"><div class="gpt-sender">Asistente</div><div class="typing-dots"><span></span><span></span><span></span></div></div></div>';
-            messagesEl.appendChild(row);
+        function addRow(type, text) {
+            const msg = createRow(type);
+            msg.textContent = text;
             messagesEl.scrollTop = messagesEl.scrollHeight;
-        }
-
-        function removeTyping() {
-            const el = document.getElementById('gpt-typing');
-            if (el) el.remove();
         }
 
         function showError(msg) {
@@ -308,10 +306,70 @@
         }
 
         function setLoading(val) {
-            loading          = val;
+            loading = val;
             sendBtn.disabled = val;
             promptEl.disabled = val;
+            if(!val) setStatus('');
         }
+
+        let recognition;
+        let isRecording = false;
+
+        window.toggleMic = function() {
+            if (isRecording) {
+                if (recognition) recognition.stop();
+                return;
+            }
+
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                showError('Tu navegador no soporta dictado por voz.');
+                return;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'es-MX';
+            recognition.interimResults = true;
+
+            recognition.onstart = function() {
+                isRecording = true;
+                micBtn.style.color = '#ef4444';
+                setStatus('ESCUCHANDO...');
+            };
+
+            recognition.onresult = function(event) {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+                
+                if (finalTranscript) {
+                    promptEl.value += (promptEl.value ? ' ' : '') + finalTranscript;
+                }
+            };
+
+            recognition.onerror = function(event) {
+                showError('Error en micrófono: ' + event.error);
+                isRecording = false;
+                micBtn.style.color = 'currentColor';
+                setStatus('ERROR');
+            };
+
+            recognition.onend = function() {
+                isRecording = false;
+                micBtn.style.color = 'currentColor';
+                setStatus('');
+                promptEl.focus();
+            };
+
+            recognition.start();
+        };
 
         window.gptSend = async function () {
             const text = promptEl.value.trim();
@@ -319,14 +377,17 @@
 
             errorEl.style.display = 'none';
             addRow('user', text);
-            promptEl.value      = '';
+            promptEl.value = '';
             promptEl.style.height = 'auto';
 
             setLoading(true);
-            addTyping();
+            setStatus('THINKING...');
+            
+            let currentMsgEl = createRow('ai');
+            currentMsgEl.innerHTML = '<span class="typing-dots" style="display:inline-block"><span></span><span></span><span></span></span>';
 
             try {
-                const res = await fetch('/ia-test', {
+                const response = await fetch('/ia-test', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -338,30 +399,67 @@
                     })
                 });
 
-                removeTyping();
+                if (!response.ok) throw new Error('Error del servidor (' + response.status + ')');
 
-                if (!res.ok) throw new Error('Error del servidor (' + res.status + ')');
-
-                const data = await res.json();
-
-                if (data.conversation_id) {
-                    conversationId = data.conversation_id;
-                    localStorage.setItem('ai_conversation_id', conversationId);
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    setStatus('ERROR');
+                    currentMsgEl.textContent = data.respuesta || 'Error al procesar la respuesta.';
+                    if (data.metadata && data.metadata.was_blocked) {
+                        showError('Bloqueado por seguridad.');
+                    }
+                    return;
                 }
 
-                // Si el backend indicó que la conversación fue completada, limpiar el conversation_id guardado
-                if (data.metadata && (data.metadata.reset_conversation || data.metadata.conversation_completed)) {
-                    conversationId = null;
-                    localStorage.removeItem('ai_conversation_id');
-                }
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let responseText = '';
+                currentMsgEl.textContent = ''; // Limpiar los dots
 
-                if (data.respuesta) {
-                    addRow('ai', data.respuesta);
-                } else {
-                    showError('La respuesta llegó vacía. Intenta de nuevo.');
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const dataStr = line.slice(6);
+                            if (!dataStr) continue;
+                            try {
+                                const data = JSON.parse(dataStr);
+                                if (data.type === 'status') {
+                                    setStatus(data.status);
+                                } else if (data.type === 'token') {
+                                    setStatus('STREAMING...');
+                                    responseText += data.token;
+                                    currentMsgEl.textContent = responseText;
+                                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                                } else if (data.type === 'error') {
+                                    setStatus('ERROR');
+                                    showError(data.error);
+                                } else if (data.type === 'done') {
+                                    setStatus('COMPLETED');
+                                    if (data.conversation_id) {
+                                        conversationId = data.conversation_id;
+                                        localStorage.setItem('ai_conversation_id', conversationId);
+                                    }
+                                    if (data.metadata && (data.metadata.reset_conversation || data.metadata.conversation_completed)) {
+                                        conversationId = null;
+                                        localStorage.removeItem('ai_conversation_id');
+                                    }
+                                }
+                            } catch (e) {
+                                console.error("Error parseando SSE chunk", dataStr, e);
+                            }
+                        }
+                    }
                 }
             } catch (err) {
-                removeTyping();
+                setStatus('ERROR');
+                currentMsgEl.textContent = 'Hubo un error de conexión.';
                 showError(err.message || 'No se pudo conectar.');
             } finally {
                 setLoading(false);
