@@ -191,8 +191,8 @@ Route::post('/ia-test', function () {
 
             $name         = null;
             $namePatterns = [
-                '/\b(?:para|para el cliente|para la clienta|para el|para la|para)\s+([^\.,;\n\r\?!\]{2,100})/i',
-                '/\bnombre(?: completo)?(?: es)?\s+([^\.,;\n\r\?!\]{2,100})/i',
+                '/\b(?:para|para el cliente|para la clienta|para el|para la|para)\s+([^\.,;\n\r\?\!]{2,100})/i',
+                '/\bnombre(?: completo)?(?: es)?\s+([^\.,;\n\r\?\!]{2,100})/i',
             ];
             foreach ($namePatterns as $pattern) {
                 if (preg_match($pattern, $pregunta, $nameMatch)) {

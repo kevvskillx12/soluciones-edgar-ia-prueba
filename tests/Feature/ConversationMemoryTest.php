@@ -6,10 +6,12 @@ use App\Models\AiConversation;
 use App\Models\AiMessage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\ParsesIaTestSse;
 use Tests\TestCase;
 
 class ConversationMemoryTest extends TestCase
 {
+    use ParsesIaTestSse;
     use RefreshDatabase;
 
     public function test_creates_conversation_id_if_not_provided(): void
@@ -21,15 +23,11 @@ class ConversationMemoryTest extends TestCase
             'pregunta' => 'Hola',
         ]);
 
-        $response->assertJsonStructure([
-            'success',
-            'conversation_id',
-            'respuesta',
-        ]);
+        $responseData = $this->parseIaTestSse($response);
 
-        $responseData = $response->json();
         $this->assertTrue($responseData['success']);
         $this->assertNotNull($responseData['conversation_id']);
+        $this->assertNotEmpty($responseData['respuesta']);
 
         $conversation = AiConversation::where('conversation_id', $responseData['conversation_id'])->first();
         $this->assertNotNull($conversation);
@@ -45,7 +43,7 @@ class ConversationMemoryTest extends TestCase
             'pregunta' => 'Hola',
         ]);
 
-        $firstResponseData = $firstResponse->json();
+        $firstResponseData = $this->parseIaTestSse($firstResponse);
         $conversationId = $firstResponseData['conversation_id'];
 
         $secondResponse = $this->postJson('/ia-test', [
@@ -53,20 +51,14 @@ class ConversationMemoryTest extends TestCase
             'conversation_id' => $conversationId,
         ]);
 
-        $secondResponse->assertJsonStructure([
-            'success',
-            'conversation_id',
-            'respuesta',
-        ]);
-
-        $secondResponseData = $secondResponse->json();
+        $secondResponseData = $this->parseIaTestSse($secondResponse);
         $this->assertEquals($conversationId, $secondResponseData['conversation_id']);
 
         $conversation = AiConversation::where('conversation_id', $conversationId)->first();
         $this->assertNotNull($conversation);
 
         $messages = AiMessage::where('ai_conversation_id', $conversation->id)->get();
-        $this->assertCount(4, $messages); // 2 requests = 4 messages (2 user, 2 assistant)
+        $this->assertCount(4, $messages);
     }
 
     public function test_saves_user_and_assistant_messages(): void
@@ -78,7 +70,7 @@ class ConversationMemoryTest extends TestCase
             'pregunta' => 'Hola',
         ]);
 
-        $responseData = $response->json();
+        $responseData = $this->parseIaTestSse($response);
         $conversationId = $responseData['conversation_id'];
 
         $conversation = AiConversation::where('conversation_id', $conversationId)->first();
@@ -104,15 +96,14 @@ class ConversationMemoryTest extends TestCase
             'pregunta' => 'Primer mensaje',
         ]);
 
-        $firstResponseData = $firstResponse->json();
+        $firstResponseData = $this->parseIaTestSse($firstResponse);
         $conversationId1 = $firstResponseData['conversation_id'];
 
-        // Don't pass the first conversation ID to ensure a new one is created
         $secondResponse = $this->postJson('/ia-test', [
             'pregunta' => 'Segundo mensaje',
         ]);
 
-        $secondResponseData = $secondResponse->json();
+        $secondResponseData = $this->parseIaTestSse($secondResponse);
         $conversationId2 = $secondResponseData['conversation_id'];
 
         $this->assertNotEquals($conversationId1, $conversationId2);
@@ -126,7 +117,7 @@ class ConversationMemoryTest extends TestCase
 
         $messages1 = AiMessage::where('ai_conversation_id', $conversation1->id)->get();
         $this->assertCount(2, $messages1);
-        
+
         $messages2 = AiMessage::where('ai_conversation_id', $conversation2->id)->get();
         $this->assertCount(2, $messages2);
     }
@@ -140,7 +131,7 @@ class ConversationMemoryTest extends TestCase
             'pregunta' => 'Hola',
         ]);
 
-        $responseData = $response->json();
+        $responseData = $this->parseIaTestSse($response);
         $conversationId = $responseData['conversation_id'];
 
         $conversation = AiConversation::where('conversation_id', $conversationId)->first();
@@ -161,13 +152,15 @@ class ConversationMemoryTest extends TestCase
             'pregunta' => 'Quiero sacar un acta de nacimiento para Luis Alfonso',
         ]);
 
-        $firstResponseData = $firstResponse->json();
+        $firstResponseData = $this->parseIaTestSse($firstResponse);
         $conversationId = $firstResponseData['conversation_id'];
 
         $secondResponse = $this->postJson('/ia-test', [
             'pregunta' => 'Su CURP es EXPL050202HYNKCSA0',
             'conversation_id' => $conversationId,
         ]);
+
+        $this->parseIaTestSse($secondResponse);
 
         $conversation = AiConversation::where('conversation_id', $conversationId)->first();
         $messages = AiMessage::where('ai_conversation_id', $conversation->id)->get();
@@ -188,13 +181,8 @@ class ConversationMemoryTest extends TestCase
             'pregunta' => 'Hola',
         ]);
 
-        $response->assertJsonStructure([
-            'success',
-            'conversation_id',
-            'respuesta',
-        ]);
+        $responseData = $this->parseIaTestSse($response);
 
-        $responseData = $response->json();
         $this->assertTrue($responseData['success']);
         $this->assertNotNull($responseData['conversation_id']);
         $this->assertNotEmpty($responseData['respuesta']);
@@ -209,7 +197,7 @@ class ConversationMemoryTest extends TestCase
             'pregunta' => 'Hola',
         ]);
 
-        $responseData = $response->json();
+        $responseData = $this->parseIaTestSse($response);
         $conversationId = $responseData['conversation_id'];
 
         $conversation = AiConversation::where('conversation_id', $conversationId)->first();
