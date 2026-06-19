@@ -1,50 +1,51 @@
-# Progreso del Agente y Registro de Auditoría
+# Progreso del agente y cierre de verificación
 
-Este documento sirve como bitácora y registro de avance del agente y el equipo de desarrollo para cumplir las metas propuestas.
+## Estado al 2026-06-19
 
----
+La implementación queda aprobada provisionalmente y no se realizaron cambios adicionales en código funcional de IA ni en pruebas.
 
-## 1. Hitos de Auditoría Inicial
+| Área | Estado | Nota |
+| --- | --- | --- |
+| Memoria persistente | Implementada | Requiere prueba manual después de reiniciar |
+| Guardrails | Implementados | Cubiertos por evidencia automatizada registrada |
+| Observabilidad | Implementada | Faltan registros de una ejecución real con Ollama |
+| Streaming SSE | Implementado | Falta confirmación visual en navegador |
+| Voz | Implementada | No verificada con micrófono real |
+| Responsive | Sin verificación manual | Requiere revisión visual |
+| Build frontend | Pendiente | Vite no encuentra el preset de Filament dentro de `vendor` |
+| PHPUnit local | Pendiente de reejecución | No hay PHP, Composer ni directorio `vendor` en el entorno |
 
-- **Fecha de Auditoría:** 2026-06-19
-- **Estado del Repositorio:** Funciona con base de datos SQLite y scripts en Python para RAG (interfaz con ChromaDB y Ollama `llama3.2:1b`).
-- **Análisis de Requisitos:**
-  - **Semana 4:** Alto cumplimiento base (80%), falta refinamiento del sliding window real de tokens y control estructurado de state poisoning en la invocación de herramientas locales.
-  - **Semana 5:** Nulo cumplimiento (0%), no hay streaming SSE, no hay observabilidad en BD, no hay guardrails de seguridad locales ni entrada de voz en el chat.
+## Verificación del entorno local
 
----
+| Comando | Resultado |
+| --- | --- |
+| `node --version` | Aprobado: `v24.14.0` |
+| `npm --version` | El wrapper PowerShell `npm.ps1` fue bloqueado por la política de ejecución |
+| `npm.cmd --version` | Aprobado: `11.9.0` |
+| `npm.cmd install` | Aprobado; 157 paquetes cambiados, 158 auditados y 9 vulnerabilidades reportadas por npm |
+| `npm.cmd run build` | Pendiente; falta `vendor/filament/support/tailwind.config.preset.js` |
 
-## 2. Registro de Progreso
+No se ejecutó `npm audit fix`, porque no forma parte del cierre y podría modificar dependencias.
 
-| ID Tarea | Descripción | Estado | Fecha de Inicio | Fecha de Fin | Notas / Evidencias |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **AUD-01** | Auditoría de código vs PDF de rúbricas | **COMPLETADO** | 2026-06-19 | 2026-06-19 | Se crearon las matrices de cumplimiento y el plan de implementación. |
-| **1.1** | Migración y Modelo de Observabilidad | **COMPLETADO** | 2026-06-19 | 2026-06-20 | Creada tabla `ai_observability_logs`. |
-| **1.2** | Capa de Seguridad (Guardrails) | **COMPLETADO** | 2026-06-20 | 2026-06-20 | Implementada validación heurística. |
-| **2.1** | Stream en `rag_bridge.py` | **COMPLETADO** | 2026-06-21 | 2026-06-21 | Adaptado a stream = True. |
-| **2.2** | Endpoint SSE en Laravel `/ia-test` | **COMPLETADO** | 2026-06-21 | 2026-06-21 | Implementado StreamedResponse. |
-| **3.1** | Sliding Window y State Poisoning | **COMPLETADO** | 2026-06-19 | 2026-06-19 | Implementado recorte por tokens real y manejo seguro de tool errors en historial. |
-| **4.1** | UI Chat Stream y Estados | **COMPLETADO** | 2026-06-22 | 2026-06-22 | Consumo del stream con JS. |
-| **4.2** | Entrada de voz en el chat | **COMPLETADO** | 2026-06-22 | 2026-06-22 | Implementada Web Speech API. |
+## Registro de pruebas
 
----
+- 19 pruebas específicas aprobadas.
+- 149 aserciones específicas aprobadas.
+- 53 de 57 pruebas globales aprobadas.
+- Cuatro fallos globales preexistentes: tres de restablecimiento de contraseña y uno de respuesta HTTP en la ruta raíz.
 
-### Fase 3: Streaming y Estados
-- [x] Refactorizar `rag_bridge.py` para emitir JSON Lines con el stream de tokens.
-- [x] Adaptar el backend de Laravel (`routes/web.php`) para usar `StreamedResponse` y enviar SSE (Server-Sent Events) hacia el cliente.
-- [x] Añadir estados de interfaz en el frontend (`SEARCHING`, `THINKING`, `STREAMING`, `ERROR`, `COMPLETED`).
-- [x] Consumir correctamente el endpoint SSE mediante el `fetch` nativo de JavaScript y `TextDecoder`.
+La reejecución local de los comandos PHPUnit no fue posible el 2026-06-19. El sistema no reconoce `vendor/bin/phpunit`; además, `vendor/autoload.php` no existe y `php` y `composer` no están disponibles en PATH. No se instalaron automáticamente.
 
-### Fase 4: Voz
-- [x] Integrar botón de micrófono interactivo en el chat de Filament.
-- [x] Utilizar Web Speech API para capturar, transcribir y colocar el audio convertido a texto dentro de la caja de texto.
+## Modelo Ollama
 
-### Fase 5: Pruebas y Revisión Final
-- [x] Ejecutar la suite global de pruebas y reportar los fallos preexistentes no relacionados a nuestro código.
-- [x] Corregir tests afectados por la migración a StreamedResponse (ej: `AiChatFlowTest`).
-- [x] Asegurar que las regresiones de la Semana 4 no existan.
+Se comprobó directamente `rag/rag_bridge.py`: el modelo activo configurado es `llama3.2:1b`.
 
----
+## Pendientes de cierre manual
 
-**Estado Final:** 
-La Semana 04 y Semana 05 han sido implementadas exitosamente. Todo el stack funciona como se esperaba, validado bajo pruebas y documentado exhaustivamente.
+- Entrada por micrófono.
+- Apariencia responsive.
+- Streaming visible en navegador.
+- Recuperación después de reiniciar.
+- Registros reales con Ollama.
+- Desconexión durante una respuesta.
+- Build frontend después de restaurar dependencias PHP.

@@ -1,20 +1,35 @@
-# Matriz de Cumplimiento de Requisitos
+# Matriz de cumplimiento técnico
 
-Esta matriz evalúa de manera individual cada uno de los requisitos establecidos en las rúbricas oficiales de evaluación técnica para las Semanas 4 y 5.
+Fecha de cierre provisional: 2026-06-19.
 
-| Requisito | Estado | Evidencia actual | Archivo relacionado | Acción necesaria |
-| :--- | :--- | :--- | :--- | :--- |
-| **S04-01: ID de Conversación Único** | CUMPLE | El controlador genera `conv_` + `uniqid()` si no recibe un ID y lo devuelve en el JSON. | [web.php](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/routes/web.php#L63-L73) | Ninguna. |
-| **S04-02: Manejo de Sesiones Nuevas/Existentes** | CUMPLE | `ConversationMemoryService::startOrResume` gestiona la carga de hilos o la creación de nuevos. | [ConversationMemoryService.php](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/app/Services/AI/ConversationMemoryService.php#L11-L32) | Ninguna. |
-| **S04-03: Almacenamiento No Volátil** | CUMPLE | Las conversaciones y mensajes se guardan en base de datos. | [migrations/2026_06_11_120524](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/database/migrations/2026_06_11_120524_create_ai_conversations_table.php) y [migrations/2026_06_11_120605](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/database/migrations/2026_06_11_120605_create_ai_messages_table.php) | Ninguna. |
-| **S04-04: Recuperación Ordenada de Historial** | CUMPLE | Se ordenan cronológicamente descendientes en BD y se invierten para el buffer. | [ConversationMemoryService.php](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/app/Services/AI/ConversationMemoryService.php#L52-L75) | Ninguna. |
-| **S04-05: Roles del Historial** | CUMPLE | Se soportan los roles `user`, `assistant`, `system` y `tool` en la base de datos. | [ConversationMemoryService.php](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/app/Services/AI/ConversationMemoryService.php#L34-L50) | Ninguna. |
-| **S04-06: Ventana de Contexto (Recorte/Resumen)** | CUMPLE | Implementado un algoritmo de sliding window real basado en tokens en `getPromptBuffer`. | [ConversationMemoryService.php](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/app/Services/AI/ConversationMemoryService.php) | Ninguna. |
-| **S04-07: Resiliencia de Herramientas (State Poisoning)** | CUMPLE | Se detectan los errores de herramienta y se inyecta una instrucción segura del sistema para evitar bucles de fallos. | [ConversationMemoryService.php](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/app/Services/AI/ConversationMemoryService.php) | Ninguna. |
-| **S05-01: Interfaz Moderna e Interactiva** | CUMPLE | Se unificó el diseño y comportamiento de estados de espera (`THINKING`, `SEARCHING`, etc.) en el chat. | [a-i-chat.blade.php](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/resources/views/filament/pages/a-i-chat.blade.php) y [ia-chat.blade.php](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/resources/views/ia-chat.blade.php) | Ninguna. |
-| **S05-02: Streaming de Tokens (SSE)** | CUMPLE | El backend responde asíncronamente devolviendo un StreamedResponse consumido token a token en frontend. | [web.php](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/routes/web.php) y [a-i-chat.blade.php](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/resources/views/filament/pages/a-i-chat.blade.php) | Ninguna. |
-| **S05-03: Estados de Carga del Agente** | CUMPLE | El frontend muestra los estados de `SEARCHING`, `THINKING`, `STREAMING`, `COMPLETED` emitidos mediante SSE. | [a-i-chat.blade.php](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/resources/views/filament/pages/a-i-chat.blade.php) | Ninguna. |
-| **S05-04: Entrada de Voz Funcional** | CUMPLE | Se implementó el uso de Web Speech API a través de un botón en la interfaz de chat. | [a-i-chat.blade.php](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/resources/views/filament/pages/a-i-chat.blade.php) | Ninguna. |
-| **S05-05: Capa de Seguridad (Guardrails)** | CUMPLE | Se incluyó una heurística en PHP que intercepta jailbreaks y bloquea los ataques (Prompt Injection). | [GuardrailService.php](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/app/Services/AI/GuardrailService.php) | Ninguna. |
-| **S05-06: Base de Datos de Observabilidad** | CUMPLE | Creada la migración y modelo para auditar tiempos (`ttft_ms`, latencia, TPS) e inyecciones. | [AiObservabilityLog.php](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/app/Models/AiObservabilityLog.php) | Ninguna. |
-| **S05-07: Registro JSON de Herramientas** | CUMPLE | Guardado estructurado de funciones locales invocadas (`rag_search`) en el campo `tools_executed`. | [web.php](file:///home/Grimm/Escritorio/soluciones-ia/soluciones-edgar-ia-prueba/routes/web.php) | Ninguna. |
+La matriz diferencia entre evidencia automatizada registrada, inspección de código y validación manual pendiente. La existencia de una implementación no sustituye una prueba visual o de operación real.
+
+| Requisito | Estado de implementación | Evidencia disponible | Validación pendiente |
+| --- | --- | --- | --- |
+| Identificador único de conversación | Implementado | Pruebas específicas registradas y `ConversationMemoryService` | Ninguna adicional para el código |
+| Reutilización y aislamiento de conversaciones | Implementado | Pruebas específicas registradas | Recuperación tras reiniciar la aplicación |
+| Persistencia de mensajes y roles | Implementado | Migraciones, modelos y pruebas específicas registradas | Recuperación tras reinicio real |
+| Ventana de contexto | Implementado | `ConversationMemoryService` y pruebas específicas registradas | Ninguna adicional para el código |
+| Manejo seguro de errores de herramientas | Implementado | Pruebas específicas registradas | Desconexión durante una respuesta |
+| Guardrails | Implementado | `GuardrailService` y pruebas específicas registradas | Revisión manual de casos adicionales |
+| Observabilidad | Implementado | Migración, modelo y pruebas específicas registradas | Registros reales generados con Ollama |
+| Streaming SSE | Implementado | Pruebas específicas registradas e inspección del flujo | Streaming visible en navegador |
+| Estados visuales del agente | Implementado | Código de interfaz | Confirmación visual en navegador |
+| Entrada por micrófono | Implementado, no verificado manualmente | Código Web Speech API | Prueba real de micrófono y permisos |
+| Apariencia responsive | No verificada manualmente | Código de vistas | Prueba en tamaños móvil, tableta y escritorio |
+| Build frontend | Pendiente | `npm.cmd run build` llega a Vite, pero falta `vendor/filament/support/tailwind.config.preset.js` | Restaurar dependencias PHP y repetir build |
+
+## Resultado de pruebas registrado para el cierre
+
+- 19 pruebas específicas aprobadas.
+- 149 aserciones específicas aprobadas.
+- 53 de 57 pruebas globales aprobadas.
+- Cuatro fallos globales preexistentes:
+  - tres casos de `PasswordResetTest`;
+  - un caso de `ExampleTest` por esperar HTTP 200 y recibir redirección HTTP 302.
+
+Estos valores se registran como resultado aprobado del cierre. El 2026-06-19 no fue posible reejecutarlos en este equipo porque `php`, `composer` y `vendor/bin/phpunit` no están disponibles localmente.
+
+## Modelo local de IA
+
+El modelo configurado en `rag/rag_bridge.py` es `llama3.2:1b`, mediante `MODELO = "llama3.2:1b"`.

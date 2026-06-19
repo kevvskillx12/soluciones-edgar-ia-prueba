@@ -1,31 +1,50 @@
-# Implementación Técnica - Semana 4: Persistencia y Memoria
+# Semana 04: persistencia y memoria
 
-Este documento detalla cómo se resolvieron y completaron todos los requisitos técnicos para la persistencia stateful del agente de IA local.
+## Alcance implementado
 
-## 1. Identificación de Sesión (`conversation_id`)
-El sistema está diseñado para que cada cliente genere o reciba un `conversation_id` único, persistido localmente en el `localStorage` del navegador y enviado en cada solicitud POST a `/ia-test`.
-- Si la solicitud no contiene ID, o si el usuario indica una nueva intención de trámite explícita, se genera un ID único mediante la función de Laravel (`conv_` + `uniqid()`).
-- Esto aísla los contextos entre distintos usuarios y distintas tareas del mismo usuario.
+La solución contiene identificación de conversación, persistencia relacional de mensajes, reutilización de contexto, aislamiento entre conversaciones, recorte de contexto y manejo de mensajes de herramienta con error.
 
-## 2. Almacenamiento No Volátil (BD Relacional)
-Se implementó un esquema de base de datos relacional para guardar el historial sin pérdida de datos en reinicios del servidor.
-- **Tabla `ai_conversations`**: Guarda el identificador único, usuario, canal y resumen.
-- **Tabla `ai_messages`**: Guarda la secuencia de mensajes con clave foránea a la conversación. Almacena el rol (`user`, `assistant`, `system`, `tool`), el contenido textual y metadata adicional en formato JSON.
+Los componentes principales son:
 
-## 3. Ventana de Contexto (Sliding Window Basado en Tokens)
-Para evitar los desbordes del modelo local `llama3.2:1b` (que tiene un límite de 8192 tokens de VRAM estándar en configuraciones pequeñas):
-- Se implementó un algoritmo dinámico en el método `getPromptBuffer()` del servicio `ConversationMemoryService`.
-- Este algoritmo lee los mensajes ordenados descendentemente por ID, calcula una aproximación de los tokens (`strlen / 4`) y acumula los mensajes hasta un máximo configurable (4000 tokens en la inferencia estándar).
-- Asegura que si el límite se excede, los mensajes más antiguos queden descartados, preservando siempre el system prompt (mediante resúmenes) y el mensaje actual.
+- `app/Services/AI/ConversationMemoryService.php`;
+- modelos `AiConversation` y `AiMessage`;
+- migraciones de conversaciones y mensajes;
+- endpoint `/ia-test`;
+- pruebas `Week4RequirementsTest.php` y `ConversationMemoryTest.php`.
 
-## 4. Manejo de Errores en Function Calling (Evitar State Poisoning)
-Una de las vulnerabilidades más comunes en agentes con herramientas locales es el bucle infinito cuando una herramienta devuelve una excepción o estado de error, y el LLM, sin contexto, vuelve a intentar llamar a la misma herramienta con idénticos parámetros.
-- Se ha interceptado esta condición en `getPromptBuffer()`.
-- Si el buffer detecta un mensaje con el rol `tool` y su estado interno (`tool_status`) es `error`, el sistema anexa automáticamente un log del sistema (`[SYSTEM LOG]`) indicando claramente que la herramienta falló de manera interna y prohibiendo reintentar los mismos parámetros.
+## Evidencia automatizada registrada
 
-## 5. Batería de Pruebas Unitarias y de Integración (PHPUnit)
-Se escribieron y validaron las siguientes pruebas:
-- Creación de nueva conversación si no se envía ID.
-- Reutilización correcta si se envía ID (sin mezclar mensajes de otras conversaciones).
-- Recorte de contexto basado en tokens (garantizando el límite del Sliding Window).
-- Control de error en herramientas verificando que no se envía la excepción desnuda, sino con prevención de state poisoning.
+El cierre registra, junto con las demás pruebas específicas:
+
+- 19 pruebas específicas aprobadas;
+- 149 aserciones específicas aprobadas.
+
+La suite global registra 53 de 57 pruebas aprobadas, con cuatro fallos preexistentes no atribuidos a la implementación de IA.
+
+## Límite de la verificación local
+
+El 2026-06-19 no se pudo reejecutar PHPUnit en este equipo:
+
+```text
+vendor/bin/phpunit: comando no reconocido
+vendor/autoload.php: no existe
+php: no disponible en PATH
+composer: no disponible en PATH
+```
+
+No se instalaron PHP ni Composer automáticamente y no se modificaron pruebas.
+
+## Validación manual pendiente
+
+La persistencia está implementada, pero no se marca como verificada la recuperación después de reiniciar la aplicación. Para cerrarla se debe:
+
+1. Crear una conversación y conservar su `conversation_id`.
+2. Confirmar los mensajes en `ai_conversations` y `ai_messages`.
+3. Detener Laravel y cualquier proceso auxiliar.
+4. Iniciar de nuevo el proyecto.
+5. Continuar con el mismo `conversation_id`.
+6. Confirmar que el contexto anterior se recupera y que no se mezclan conversaciones.
+
+## Modelo utilizado
+
+El puente RAG mantiene `llama3.2:1b`, configurado en `rag/rag_bridge.py`.

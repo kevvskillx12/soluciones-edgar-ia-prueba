@@ -1,44 +1,54 @@
-# Implementación Semana 05
+# Semana 05: guardrails, observabilidad, streaming y voz
 
-Este documento resume la implementación completa de la Semana 05, abordando las áreas de Guardrails, Observabilidad, Streaming y Voz, y Pruebas Globales.
+## Alcance implementado
 
-## Fases Completadas
+- Guardrails locales antes de invocar el modelo.
+- Registro en `ai_observability_logs`.
+- Métricas de TTFT, latencia total y tokens por segundo.
+- Registro JSON de herramientas ejecutadas.
+- Streaming mediante SSE.
+- Estados visuales del agente.
+- Integración de Web Speech API para entrada por micrófono.
 
-### Fase 1: Guardrails
-- **`GuardrailService` en PHP**: Implementado en `app/Services/AI/GuardrailService.php`. Normaliza el prompt y bloquea proactivamente inyecciones, jailbreaks ("ignora las instrucciones anteriores", "revela el system prompt", etc.) y longitudes excesivas.
-- **Flujo Controlado**: Al detectarse una inyección, se bloquea la solicitud antes de llamar al LLM (ahorrando tiempo y cómputo) y se marca como `was_blocked=true`.
+## Evidencia automatizada registrada
 
-### Fase 2: Observabilidad
-- **Métricas detalladas**: Se implementó la migración y el modelo `AiObservabilityLog`. 
-- Se capturan las métricas clave:
-  - `user_prompt`: Prompt del usuario.
-  - `system_response`: Respuesta generada (ya sea LLM, fallback o bloqueo).
-  - `was_blocked`: True si fue bloqueado por el Guardrail.
-  - `ttft_ms`: Time to First Token (en ms).
-  - `total_latency_ms`: Latencia total (en ms).
-  - `tokens_per_second`: Velocidad de generación (TPS).
-- Se modificó `routes/web.php` para registrar estas métricas al finalizar o al bloquear cada solicitud.
+- 19 pruebas específicas aprobadas.
+- 149 aserciones específicas aprobadas.
+- 53 de 57 pruebas globales aprobadas.
+- Cuatro fallos globales preexistentes:
+  - tres en `PasswordResetTest`;
+  - uno en `ExampleTest`, por la redirección HTTP 302 de `/`.
 
-### Fase 3: Streaming y Estados (SSE)
-- **`rag_bridge.py`**: Refactorizado para usar `stream: True` al consultar a Ollama y emitir `print` de JSON lines incrementales.
-- **Backend (`routes/web.php`)**: Sustituido el `shell_exec` sincrónico por `Symfony\Component\Process\Process` y `response()->stream()` para empujar eventos Server-Sent Events (SSE).
-- **Frontend (`a-i-chat.blade.php` e `ia-chat.blade.php`)**:
-  - Implementado consumo del stream SSE usando `fetch()` y `getReader()`.
-  - Se añadieron estados de interfaz interactiva: `SEARCHING`, `THINKING`, `STREAMING`, `ERROR` y `COMPLETED`.
+Los comandos específicos que deben conservarse como evidencia reproducible están en `docs/comandos-demostracion.md`.
 
-### Fase 4: Voz
-- **Web Speech API**: Agregado un botón de micrófono (con icono) en el frontend de Filament (`a-i-chat.blade.php`).
-- Al presionar, el navegador escucha y transcribe (con resultados parciales y finales) directamente al área de texto del prompt, listo para enviar.
+## Estado del build frontend
 
-### Fase 5: Pruebas y Fallos Preexistentes
-- Se crearon pruebas unitarias y funcionales para la Semana 5 (ej. `Phase2ObservabilityTest`).
-- Se validó que las pruebas de la Semana 4 continúan funcionando (`Week4RequirementsTest`).
-- Se reparó `AiChatFlowTest` que había roto temporalmente al migrar el endpoint a Streaming (se modificó para leer el `StreamedResponse`).
+El build queda pendiente, no aprobado.
 
-#### Fallos preexistentes en la suite global (4 fallos, 0 por nuestra implementación actual):
-1. **PasswordResetTest (3 tests fallidos)**: Los tests esperan que la notificación `ResetPassword` sea enviada (`NotificationFake`), pero falla porque aparentemente la lógica de envío de correo/reset de la plantilla por defecto no está configurada o no dispara el evento adecuado en este entorno.
-2. **ExampleTest (1 test fallido)**: El test `test_the_application_returns_a_successful_response` espera un código `200` en la ruta `/`, pero la aplicación devuelve un `302` (probablemente una redirección al `/admin` de Filament o al login).
-Ninguno de estos fallos está relacionado con la implementación del Chat IA (Semana 4 y 5).
+`npm.cmd install` terminó correctamente. Después, `npm.cmd run build` falló porque Tailwind intenta cargar:
 
-## Conclusión
-La Semana 05 ha sido implementada en su totalidad cumpliendo todos los requisitos de la rúbrica.
+```text
+./vendor/filament/support/tailwind.config.preset.js
+```
+
+El directorio `vendor` no está instalado en este entorno. No se modificó `tailwind.config.js` ni se instaló PHP/Composer automáticamente.
+
+## Elementos que no se consideran verificados automáticamente
+
+- Entrada por micrófono.
+- Apariencia responsive.
+- Streaming visible en navegador.
+- Registros reales con Ollama.
+- Desconexión durante una respuesta.
+
+La presencia del código y las pruebas con dobles controlados no sustituyen esas comprobaciones manuales.
+
+## Modelo Ollama comprobado
+
+`rag/rag_bridge.py` define:
+
+```python
+MODELO = "llama3.2:1b"
+```
+
+Por tanto, la documentación del cierre mantiene `llama3.2:1b`.
