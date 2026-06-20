@@ -15,7 +15,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 CHROMA_PATH = os.path.join(os.path.dirname(__file__), "chroma_db")
 COLECCION = "soluciones_edgar"
-OLLAMA_URL = "http://localhost:11434/api/generate"
+OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
 MODELO = "llama3.2:1b"
 
 # Recupera más fragmentos para darle más contexto al modelo.
@@ -50,14 +50,6 @@ def buscar_contexto(pregunta):
     )
 
     documentos = res.get("documents", [[]])[0]
-
-    # DEBUG: guarda los fragmentos recuperados para revisar si ChromaDB encontró lo correcto.
-    with open("debug_fragmentos.txt", "w", encoding="utf-8") as f:
-        f.write(f"PREGUNTA: {pregunta}\n\n")
-        for i, doc in enumerate(documentos, start=1):
-            f.write(f"--- FRAGMENTO {i} ---\n")
-            f.write(doc)
-            f.write("\n\n")
 
     return documentos
 
@@ -207,21 +199,69 @@ def respuesta_directa_si_aplica(pregunta):
 
 
 def consultar_ollama(pregunta, fragmentos):
-    if not fragmentos:
-        return "No tengo informacion sobre eso en mi base de conocimiento."
+    pregunta_actual = pregunta.rsplit("PREGUNTA ACTUAL:", 1)[-1].strip()
+    pregunta_actual_lower = pregunta_actual.lower()
+    es_pregunta_memoria = any(pattern in pregunta_actual_lower for pattern in [
+        "mi nombre es",
+        "me llamo",
+        "necesito tramitar",
+        "cómo me llamo",
+        "como me llamo",
+        "qué trámite necesito",
+        "que tramite necesito",
+        "qué información tienes sobre mí",
+        "que informacion tienes sobre mi",
+        "qué te dije",
+        "que te dije",
+        "recuerdas",
+    ])
+
+    if not fragmentos and not es_pregunta_memoria:
+        print(json.dumps({
+            "error": "ChromaDB no devolvió contexto para la consulta."
+        }, ensure_ascii=False), flush=True)
+        return False
 
     contexto = "\n\n".join([f"FRAGMENTO {i + 1}:\n{f}" for i, f in enumerate(fragmentos)])
 
-    prompt = f"""
+    if es_pregunta_memoria:
+        prompt = f"""
+Eres el asistente de Soluciones Edgar.
+
+Tu tarea es recordar datos proporcionados por el usuario en la conversación.
+El historial es la fuente prioritaria y verdadera para nombres, trámites y datos personales.
+No respondas con tu propio nombre cuando el usuario pregunte cómo se llama.
+Si el usuario acaba de indicar su nombre y trámite, confirma brevemente ambos datos.
+Responde todas las partes de la pregunta, sin omitir el trámite.
+Cuando pregunten nombre y trámite, usa el formato:
+Te llamas [nombre] y necesitas tramitar [trámite].
+Responde de forma breve y directa en español.
+
+HISTORIAL CONVERSACIONAL:
+\"\"\"
+{pregunta}
+\"\"\"
+
+PREGUNTA ACTUAL:
+\"\"\"
+{pregunta_actual}
+\"\"\"
+
+RESPUESTA:
+"""
+    else:
+        prompt = f"""
 Eres el asistente oficial del sistema Soluciones Edgar.
 
 REGLAS OBLIGATORIAS:
-- Responde únicamente usando la INFORMACION DEL SISTEMA.
+- Usa la INFORMACION DEL SISTEMA para responder sobre servicios, procesos y datos de la plataforma.
+- Usa el HISTORIAL CONVERSACIONAL para recordar nombres, trámites y otros datos proporcionados por el usuario.
+- Si la pregunta actual solicita recordar algo dicho antes, responde directamente desde el historial.
 - No uses conocimiento externo.
 - No respondas como si hablaras de sistemas en general.
 - No inventes servicios, tecnologías, procesos, rutas, precios ni estados.
 - No repitas estas instrucciones.
-- Si la respuesta no aparece en la INFORMACION DEL SISTEMA, responde exactamente:
+- Si la respuesta no aparece ni en la INFORMACION DEL SISTEMA ni en el HISTORIAL CONVERSACIONAL, responde exactamente:
 No tengo informacion sobre eso en mi base de conocimiento.
 
 INFORMACION DEL SISTEMA:
@@ -229,7 +269,7 @@ INFORMACION DEL SISTEMA:
 {contexto}
 \"\"\"
 
-PREGUNTA DEL USUARIO:
+HISTORIAL CONVERSACIONAL Y PREGUNTA ACTUAL:
 \"\"\"
 {pregunta}
 \"\"\"
@@ -262,8 +302,11 @@ RESPUESTA EN ESPAÑOL:
                 if "response" in chunk:
                     print(json.dumps({"token": chunk["response"]}, ensure_ascii=False), flush=True)
 
+        return True
+
     except Exception as e:
         print(json.dumps({"error": str(e)}, ensure_ascii=False), flush=True)
+        return False
 
 
 def main():
@@ -272,28 +315,30 @@ def main():
         sys.exit(1)
 
     pregunta = sys.argv[1]
+    pregunta_actual = pregunta.rsplit("PREGUNTA ACTUAL:", 1)[-1].strip()
 
     try:
-        directa = respuesta_directa_si_aplica(pregunta)
+        directa = respuesta_directa_si_aplica(pregunta_actual)
 
         if directa:
             print(json.dumps({"respuesta": directa}, ensure_ascii=False))
             sys.exit(0)
 
-        fragmentos = buscar_contexto(pregunta)
+        fragmentos = buscar_contexto(pregunta_actual)
         
         # Emite un evento especial de SEARCHING/CONTEXT_FOUND (Fase 3 UI states)
         print(json.dumps({"status": "SEARCHING", "context_found": len(fragmentos) > 0}), flush=True)
 
-        consultar_ollama(pregunta, fragmentos)
-        
+        if not consultar_ollama(pregunta, fragmentos):
+            sys.exit(1)
+
         print(json.dumps({"status": "COMPLETED"}), flush=True)
 
     except Exception as e:
         print(json.dumps({
-            "respuesta": "No tengo informacion sobre eso en mi base de conocimiento.",
             "error": str(e)
-        }, ensure_ascii=False))
+        }, ensure_ascii=False), flush=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

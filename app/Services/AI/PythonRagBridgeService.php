@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Log;
  */
 class PythonRagBridgeService implements RagBridgeService
 {
-    private string $pythonPath;
+    private ?string $pythonPath;
     private string $scriptPath;
 
     public function __construct()
@@ -30,30 +30,76 @@ class PythonRagBridgeService implements RagBridgeService
             return false;
         }
 
-        $command = sprintf(
-            'PYTHONIOENCODING=utf-8 %s %s %s 2>&1',
-            escapeshellarg($this->pythonPath),
-            escapeshellarg($this->scriptPath),
-            escapeshellarg($query)
-        );
+        $environment = getenv();
+        if (!is_array($environment)) {
+            $environment = [];
+        }
+        $environment['PYTHONIOENCODING'] = 'utf-8';
 
-        $process = Process::fromShellCommandline($command);
+        $process = new Process(
+            [$this->pythonPath, $this->scriptPath, $query],
+            base_path(),
+            $environment
+        );
         $process->setTimeout(300);
         $process->start();
 
-        $process->wait(function ($type, $buffer) use ($onChunk) {
-            foreach (explode("\n", trim($buffer)) as $line) {
-                if (empty(trim($line))) {
+        $stdoutBuffer = '';
+        $receivedContent = false;
+
+        $process->wait(function ($type, $buffer) use ($onChunk, &$stdoutBuffer, &$receivedContent) {
+            if ($type === Process::ERR) {
+                Log::warning('RagBridge: salida de error de Python', [
+                    'stderr' => trim($buffer),
+                ]);
+
+                return;
+            }
+
+            $stdoutBuffer .= $buffer;
+
+            while (($newlinePosition = strpos($stdoutBuffer, "\n")) !== false) {
+                $line = trim(substr($stdoutBuffer, 0, $newlinePosition));
+                $stdoutBuffer = substr($stdoutBuffer, $newlinePosition + 1);
+
+                if ($line === '') {
                     continue;
                 }
+
                 $data = json_decode($line, true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    $onChunk($data);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    Log::warning('RagBridge: línea JSON inválida', ['line' => $line]);
+                    continue;
                 }
+
+                $receivedContent = $receivedContent
+                    || isset($data['token'])
+                    || isset($data['respuesta']);
+                $onChunk($data);
             }
         });
 
-        return $process->isSuccessful();
+        $remainingLine = trim($stdoutBuffer);
+        if ($remainingLine !== '') {
+            $data = json_decode($remainingLine, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $receivedContent = $receivedContent
+                    || isset($data['token'])
+                    || isset($data['respuesta']);
+                $onChunk($data);
+            }
+        }
+
+        if (!$process->isSuccessful() || !$receivedContent) {
+            Log::warning('RagBridge: proceso sin respuesta útil', [
+                'exit_code' => $process->getExitCode(),
+                'stderr' => trim($process->getErrorOutput()),
+                'python' => $this->pythonPath,
+                'script' => $this->scriptPath,
+            ]);
+        }
+
+        return $process->isSuccessful() && $receivedContent;
     }
 
     private function resolvePythonPath(): ?string
@@ -71,12 +117,21 @@ class PythonRagBridgeService implements RagBridgeService
         }
 
         if (stripos(PHP_OS_FAMILY, 'Windows') !== false) {
-            foreach (['where python', 'where python3'] as $cmd) {
+            foreach (['where.exe python', 'where.exe python3', 'where.exe py'] as $cmd) {
                 $out = trim(@shell_exec($cmd . ' 2>NUL'));
                 foreach (preg_split('/\r?\n/', $out) as $path) {
                     if ($path && file_exists($path)) {
                         return $path;
                     }
+                }
+            }
+
+            $localAppData = getenv('LOCALAPPDATA');
+            if ($localAppData) {
+                $installedPython = glob($localAppData . '/Programs/Python/Python*/python.exe') ?: [];
+                if ($installedPython !== []) {
+                    rsort($installedPython);
+                    return $installedPython[0];
                 }
             }
         } else {

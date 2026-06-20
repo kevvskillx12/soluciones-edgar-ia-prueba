@@ -100,7 +100,7 @@ Route::post('/ia-test', function () {
         }
 
         // ── Historial y contexto ──────────────────────────────────────────────
-        $conversationHistory = $memoryService->getPromptBuffer($conversation, 20);
+        $conversationHistory = $memoryService->getPromptBuffer($conversation, 4000);
         $conversationContext = '';
         if (!empty($conversationHistory)) {
             $conversationContext = collect($conversationHistory)
@@ -283,6 +283,10 @@ Route::post('/ia-test', function () {
         };
 
         $generateSimpleResponse = function ($pregunta, array $conversationHistory = [], $conversation = null, $memoryService = null, $user = null) use ($extractOrderContext, $findServiceByName, $createOrderIfReady) {
+            if (preg_match('/\b(c[oó]mo me llamo|qu[eé] tr[aá]mite necesito|qu[eé] informaci[oó]n tienes sobre m[ií]|qu[eé] te dije|recuerdas)\b/iu', $pregunta)) {
+                return null;
+            }
+
             $orderContext  = $extractOrderContext($pregunta, $conversationHistory);
             $service       = $orderContext['service'];
             $name          = $orderContext['name'];
@@ -345,19 +349,7 @@ Route::post('/ia-test', function () {
             if ($hasService && !$hasName) {
                 return sprintf('Entendido. Para el %s, necesito el nombre completo del cliente.', $service ?: 'trámite');
             }
-            if (preg_match('/hola|buenos días|buenas tardes|buenas noches/i', $pregunta)) {
-                return '¡Hola! ¿En qué puedo ayudarte hoy?';
-            }
-            if (preg_match('/cómo estás|cómo va/i', $pregunta)) {
-                return 'Estoy funcionando bien. ¿En qué puedo ayudarte?';
-            }
-            if (preg_match('/gracias/i', $pregunta)) {
-                return '¡De nada! ¿Necesitas algo más?';
-            }
-            if (preg_match('/nombre/i', $pregunta)) {
-                return 'Soy el asistente de Soluciones Edgar.';
-            }
-            return 'Entiendo tu pregunta. ¿Podrías proporcionar más detalles?';
+            return null;
         };
 
         // ── SSE único — usa RagBridgeService inyectable ───────────────────────
@@ -374,6 +366,13 @@ Route::post('/ia-test', function () {
                 $tokenCount            = 0;
                 $ttftMs                = null;
                 $activeGenerationStart = null;
+                $businessResponse      = $generateSimpleResponse(
+                    $pregunta,
+                    $conversationHistory,
+                    $conversation,
+                    $memoryService,
+                    $user
+                );
 
                 $onChunk = function (array $data) use (
                     &$fullResponse, &$ttftRecorded, &$tokenCount,
@@ -407,23 +406,38 @@ Route::post('/ia-test', function () {
                     }
                 };
 
-                $success = $ragBridge->stream($preguntaConContexto, $onChunk);
+                if ($businessResponse) {
+                    $ttftMs = round((microtime(true) - $startTime) * 1000, 2);
+                    $ttftRecorded = true;
+                    $fullResponse = $businessResponse;
+                    $tokenCount = max(1, (int) ceil(strlen($fullResponse) / 4));
+                    echo "data: " . json_encode(['type' => 'token', 'token' => $fullResponse]) . "\n\n";
+                    ob_flush(); flush();
+                    $success = false;
+                } else {
+                    $success = $ragBridge->stream($preguntaConContexto, $onChunk);
+                }
 
-                // Fallback si el bridge no devolvió nada
+                // Solo conserva respuestas deterministas de negocio. Nunca simula
+                // una respuesta general cuando el bridge Python/Ollama falla.
                 if (empty(trim($fullResponse))) {
                     if (!$ttftRecorded) {
                         $ttftMs       = round((microtime(true) - $startTime) * 1000, 2);
                         $ttftRecorded = true;
                     }
-                    $fullResponse = $generateSimpleResponse($pregunta, $conversationHistory, $conversation, $memoryService, $user);
+
+                    $fullResponse = 'No fue posible conectar con el servicio local de IA. Verifica Python y Ollama e intenta de nuevo.';
                     $tokenCount   = max(1, (int) ceil(strlen($fullResponse) / 4));
-                    echo "data: " . json_encode(['type' => 'token', 'token' => $fullResponse]) . "\n\n";
+
+                    echo "data: " . json_encode(['type' => 'error', 'error' => $fullResponse]) . "\n\n";
                     ob_flush(); flush();
                 }
 
                 // Guardar mensaje asistente
                 try {
-                    $memoryService->addAssistantMessage($conversation, $fullResponse, ['tool' => $success ? 'rag_stream' : 'fallback']);
+                    $memoryService->addAssistantMessage($conversation, $fullResponse, [
+                        'tool' => $success ? 'rag_stream' : ($businessResponse ? 'business_fallback' : 'rag_bridge_error'),
+                    ]);
                 } catch (\Throwable $e) {
                     \Illuminate\Support\Facades\Log::error('No se pudo guardar mensaje assistant: ' . $e->getMessage());
                 }
@@ -439,9 +453,9 @@ Route::post('/ia-test', function () {
                     'total_latency_ms'   => $totalLatencyMs,
                     'tokens_per_second'  => $tps,
                     'tools_executed'     => [
-                        'name'        => $success ? 'rag_search' : 'fallback',
+                        'name'        => $success ? 'rag_search' : ($businessResponse ? 'business_fallback' : 'rag_bridge'),
                         'parameters'  => ['query' => $pregunta],
-                        'status'      => 'SUCCESS',
+                        'status'      => $success || $businessResponse ? 'SUCCESS' : 'ERROR',
                         'duration_ms' => $totalLatencyMs,
                     ],
                     'was_blocked' => false,
