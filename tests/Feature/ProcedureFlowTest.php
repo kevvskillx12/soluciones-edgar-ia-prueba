@@ -270,6 +270,90 @@ class ProcedureFlowTest extends TestCase
         );
     }
 
+    public function test_greeting_without_active_procedure_does_not_invent_state(): void
+    {
+        $parsed = $this->send('hola');
+
+        $this->assertSame('Hola. ¿Qué trámite necesitas realizar?', $parsed['respuesta']);
+        $this->assertStringNotContainsString('Acta de Nacimiento', $parsed['respuesta']);
+        $this->assertStringNotContainsString('Tramitar Una', $parsed['respuesta']);
+        $this->assertSame(0, $this->fakeRagBridge->invocationCount);
+    }
+
+    public function test_greeting_with_active_procedure_does_not_advance_current_field(): void
+    {
+        $conversationId = $this->startActaFlow();
+        $before = $this->state($conversationId);
+        $parsed = $this->send('hola', $conversationId);
+
+        $this->assertStringContainsString('Tienes un trámite en curso de Acta de Nacimiento', $parsed['respuesta']);
+        $this->assertStringContainsString('continuarlo, cambiarlo o iniciar uno nuevo', $parsed['respuesta']);
+        $this->assertSame($before, $this->state($conversationId));
+    }
+
+    public function test_corrupt_subject_state_is_reset(): void
+    {
+        $conversationId = $this->startActaFlow();
+        $conversation = AiConversation::where('conversation_id', $conversationId)->firstOrFail();
+        $metadata = $conversation->metadata;
+        $metadata['procedure_flow']['subject_name'] = 'Tramitar Una';
+        $conversation->update(['metadata' => $metadata]);
+
+        $parsed = $this->send('hola', $conversationId);
+
+        $this->assertSame(
+            'Detecté un flujo anterior incompleto. ¿Qué trámite necesitas realizar?',
+            $parsed['respuesta']
+        );
+        $this->assertNull($this->state($conversationId)['subject_name']);
+        $this->assertNull($this->state($conversationId)['service_id']);
+    }
+
+    public function test_curp_request_asks_for_person_without_inventing_one(): void
+    {
+        $parsed = $this->send('necesito hacer un tramite de curp');
+        $state = $this->state($parsed['conversation_id']);
+
+        $this->assertSame('Seleccionaste el trámite CURP. ¿Para quién es el trámite?', $parsed['respuesta']);
+        $this->assertNull($state['subject_name']);
+    }
+
+    public function test_explicit_person_is_saved_and_curp_is_requested(): void
+    {
+        $first = $this->send('necesito hacer un tramite de curp');
+        $parsed = $this->send('para Kevin Montero', $first['conversation_id']);
+
+        $this->assertStringContainsString('trámite CURP para Kevin Montero', $parsed['respuesta']);
+        $this->assertStringContainsString('dato: CURP', $parsed['respuesta']);
+        $this->assertSame('Kevin Montero', $this->state($first['conversation_id'])['subject_name']);
+    }
+
+    public function test_tramitar_una_curp_never_becomes_subject_name(): void
+    {
+        $parsed = $this->send('quiero tramitar una curp');
+
+        $this->assertNull($this->state($parsed['conversation_id'])['subject_name']);
+        $this->assertStringNotContainsString('Tramitar Una', $parsed['respuesta']);
+    }
+
+    public function test_new_conversation_does_not_inherit_procedure_flow(): void
+    {
+        $first = $this->send('necesito hacer un tramite de curp');
+        $second = $this->parseIaTestSse($this->postJson('/ia-test', [
+            'pregunta' => 'hola',
+            'conversation_id' => $first['conversation_id'],
+            'new_conversation' => true,
+        ]));
+
+        $this->assertNotSame($first['conversation_id'], $second['conversation_id']);
+        $this->assertSame('Hola. ¿Qué trámite necesitas realizar?', $second['respuesta']);
+        $this->assertNull(
+            AiConversation::where('conversation_id', $second['conversation_id'])
+                ->firstOrFail()
+                ->metadata['procedure_flow'] ?? null
+        );
+    }
+
     private function startCurpFlow(): string
     {
         $first = $this->send('Necesito un trámite para Kevin Montero');
@@ -283,6 +367,14 @@ class ProcedureFlowTest extends TestCase
         $first = $this->send("Quiero un trámite para {$subject}");
         $this->send('acta de nacimiento', $first['conversation_id']);
         $this->send('ABCD010203HYNXXX09', $first['conversation_id']);
+
+        return $first['conversation_id'];
+    }
+
+    private function startActaFlow(string $subject = 'Kevin Montero'): string
+    {
+        $first = $this->send("Quiero un trámite para {$subject}");
+        $this->send('acta de nacimiento', $first['conversation_id']);
 
         return $first['conversation_id'];
     }

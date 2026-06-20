@@ -20,6 +20,32 @@ class ProcedureFlowService
         $state = $this->getState($conversation);
         $normalized = $this->normalize($prompt);
 
+        if ($state && $this->isCorruptState($state)) {
+            $state = $this->emptyState();
+            $this->persistState($conversation, $state, false);
+
+            return $this->handled(
+                'Detecté un flujo anterior incompleto. ¿Qué trámite necesitas realizar?',
+                $state
+            );
+        }
+
+        if ($this->isGenericGreeting($normalized)) {
+            if ($state && !empty($state['service_name']) && in_array(
+                $state['status'] ?? null,
+                ['collecting', 'ready_to_confirm', 'awaiting_subject'],
+                true
+            )) {
+                return $this->handled(
+                    "Hola. Tienes un trámite en curso de {$state['service_name']}. "
+                    . '¿Deseas continuarlo, cambiarlo o iniciar uno nuevo?',
+                    $state
+                );
+            }
+
+            return $this->handled('Hola. ¿Qué trámite necesitas realizar?', $state);
+        }
+
         $creationStatusResponse = $this->answerCreationStatusQuestion($normalized, $state);
         if ($creationStatusResponse !== null) {
             return $this->handled($creationStatusResponse, $state);
@@ -156,7 +182,7 @@ class ProcedureFlowService
         }
 
         $current = $this->currentFieldDefinition($state);
-        $prefix = $service
+        $prefix = $service || $subjectName
             ? "Perfecto, iniciaré el trámite {$state['service_name']} para {$state['subject_name']}."
             : 'Gracias.';
 
@@ -528,21 +554,92 @@ class ProcedureFlowService
     private function extractSubjectName(string $prompt): ?string
     {
         $patterns = [
-            '/\b(?:trámite|tramite)\s+(?:de\s+\S+\s+)?para\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+){0,4})/u',
-            '/\b(?:curp|acta de nacimiento|rfc|nss)\s+(?:para|de)\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+){0,4})/iu',
-            '/\b(?:mi nombre es|me llamo)\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+){0,4})/iu',
+            '/\b(?:a nombre de|del cliente|para la persona|para)\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+){1,3})/iu',
+            '/\b(?:mi nombre es|me llamo)\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+){1,3})/iu',
         ];
 
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $prompt, $match) === 1) {
                 $candidate = trim($match[1], " \t\n\r\0\x0B.,;:¿?¡!");
-                if ($candidate !== '' && !in_array($this->normalize($candidate), ['una curp', 'un curp'], true)) {
+                if ($candidate !== '' && $this->isValidSubjectName($candidate)) {
                     return mb_convert_case($candidate, MB_CASE_TITLE, 'UTF-8');
                 }
             }
         }
 
         return null;
+    }
+
+    private function isValidSubjectName(string $candidate): bool
+    {
+        $forbidden = [
+            'tramitar',
+            'tramite',
+            'curp',
+            'acta',
+            'nacimiento',
+            'solicitud',
+            'servicio',
+            'una',
+            'un',
+        ];
+
+        $words = preg_split('/\s+/u', $this->normalize($candidate), -1, PREG_SPLIT_NO_EMPTY);
+
+        return count($words) >= 2
+            && collect($words)->every(fn (string $word) => !in_array($word, $forbidden, true));
+    }
+
+    private function isGenericGreeting(string $normalized): bool
+    {
+        return in_array($normalized, [
+            'hola',
+            'buenos dias',
+            'buenas tardes',
+            'buenas noches',
+            'que tal',
+            'ayuda',
+        ], true);
+    }
+
+    private function isCorruptState(array $state): bool
+    {
+        $subject = $state['subject_name'] ?? $state['person_name'] ?? null;
+        if ($subject && !$this->isValidSubjectName((string) $subject)) {
+            return true;
+        }
+
+        $serviceId = $state['service_id'] ?? null;
+        if (!$serviceId) {
+            return !empty($state['service_name'])
+                || !empty($state['current_field'])
+                || !empty($state['required_fields']);
+        }
+
+        $service = Service::find($serviceId);
+        if (!$service) {
+            return true;
+        }
+
+        $serviceName = $state['service_name'] ?? null;
+        $validNames = [$service->name];
+        if ($service->code === 'CURP-01') {
+            $validNames[] = 'CURP';
+        }
+        if (!$serviceName || !in_array($serviceName, $validNames, true)) {
+            return true;
+        }
+
+        $requiredFields = collect($state['required_fields'] ?? []);
+        if (in_array($state['status'] ?? null, ['collecting', 'ready_to_confirm'], true)
+            && $requiredFields->isEmpty()) {
+            return true;
+        }
+
+        $currentField = $state['current_field'] ?? null;
+
+        return $currentField !== null
+            && !$requiredFields->contains(fn ($field) => ($field['name'] ?? null) === $currentField);
     }
 
     private function looksLikeProcedureRequest(string $normalized): bool

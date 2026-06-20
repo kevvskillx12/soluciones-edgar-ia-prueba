@@ -222,7 +222,11 @@
         recognition.onerror = (event) => {
             listening = false;
             micBtn.classList.remove('listening');
-            setStatus(`Error de micrófono: ${event.error}`);
+            const message = event.error === 'network'
+                ? 'No se pudo conectar al reconocimiento de voz del navegador. Prueba en Chrome o Edge, revisa conexión o desactiva bloqueadores de privacidad.'
+                : `No fue posible usar el micrófono del navegador: ${event.error}`;
+            console.warn('Web Speech API:', event.error, message);
+            setStatus(message);
         };
 
         recognition.onend = () => {

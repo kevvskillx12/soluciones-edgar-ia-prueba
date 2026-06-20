@@ -264,6 +264,11 @@
 
     <div id="gpt-input-bar">
         <div id="gpt-error"></div>
+        <div style="max-width: 680px; margin: 0 auto 8px; display: flex; justify-content: flex-end;">
+            <button id="gpt-new-chat" type="button" style="border: 1px solid #555; border-radius: 8px; padding: 6px 12px; color: #ddd; background: #242424; cursor: pointer;">
+                Nuevo chat
+            </button>
+        </div>
         <div class="gpt-input-wrap">
             <button id="gpt-mic" type="button" title="Dictar por voz" aria-label="Dictar por voz" aria-pressed="false">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -292,9 +297,11 @@
         const errorEl    = document.getElementById('gpt-error');
         const statusEl   = document.getElementById('gpt-status-text');
         const micBtn     = document.getElementById('gpt-mic');
+        const newChatBtn = document.getElementById('gpt-new-chat');
 
         let loading = false;
         let conversationId = localStorage.getItem('ai_conversation_id') || null;
+        let forceNewConversation = false;
 
         promptEl.addEventListener('input', function () {
             this.style.height = 'auto';
@@ -416,12 +423,16 @@
             };
 
             recognition.onerror = function(event) {
-                showError('Error en micrófono: ' + event.error);
+                const message = event.error === 'network'
+                    ? 'No se pudo conectar al reconocimiento de voz del navegador. Prueba en Chrome o Edge, revisa conexión o desactiva bloqueadores de privacidad.'
+                    : 'No fue posible usar el micrófono del navegador: ' + event.error;
+                console.warn('Web Speech API:', event.error, message);
+                showError(message);
                 isRecording = false;
                 micBtn.classList.remove('is-listening', 'is-processing');
                 micBtn.setAttribute('aria-pressed', 'false');
                 micBtn.title = 'Dictar por voz';
-                setStatus('ERROR');
+                setStatus('MICRÓFONO DISPONIBLE');
             };
 
             recognition.onend = function() {
@@ -474,8 +485,10 @@
                     body: JSON.stringify({
                         pregunta: text,
                         conversation_id: conversationId,
+                        new_conversation: forceNewConversation,
                     })
                 });
+                forceNewConversation = false;
 
                 if (!response.ok) throw new Error('Error del servidor (' + response.status + ')');
 
@@ -550,6 +563,21 @@
             promptEl.dispatchEvent(new Event('input'));
             promptEl.focus();
         };
+
+        newChatBtn.addEventListener('click', function () {
+            conversationId = null;
+            forceNewConversation = true;
+            localStorage.removeItem('ai_conversation_id');
+            messagesEl.replaceChildren();
+            const empty = document.createElement('div');
+            empty.id = 'gpt-empty';
+            empty.innerHTML = '<h1>¿Con qué puedo ayudarte?</h1>';
+            messagesEl.appendChild(empty);
+            errorEl.style.display = 'none';
+            setStatus('NUEVO CHAT LISTO');
+            promptEl.value = '';
+            promptEl.focus();
+        });
 
         promptEl.focus();
     })();

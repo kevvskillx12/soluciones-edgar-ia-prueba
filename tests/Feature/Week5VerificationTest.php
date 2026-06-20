@@ -154,7 +154,8 @@ class Week5VerificationTest extends TestCase
         $secondParsed = $this->parseIaTestSse($second);
 
         $this->assertEquals($convId, $secondParsed['conversation_id']);
-        $this->assertEquals(2, $this->fakeRagBridge->invocationCount);
+        $this->assertSame('Hola. ¿Qué trámite necesitas realizar?', $firstParsed['respuesta']);
+        $this->assertEquals(1, $this->fakeRagBridge->invocationCount);
     }
 
     /** @test */
