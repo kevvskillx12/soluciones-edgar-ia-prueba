@@ -160,6 +160,56 @@
         font-family: inherit;
     }
     #gpt-prompt::placeholder { color: #6b6b6b; }
+    #gpt-mic {
+        width: 38px;
+        height: 38px;
+        padding: 0;
+        border: 1px solid #5b5b5b;
+        border-radius: 10px;
+        background: #3a3a3a;
+        color: #ececec;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 38px;
+        visibility: visible;
+        opacity: 1;
+        transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.1s;
+    }
+    #gpt-mic:hover:not(:disabled) {
+        background: #4a4a4a;
+        border-color: #777;
+    }
+    #gpt-mic:active:not(:disabled) { transform: scale(0.94); }
+    #gpt-mic svg {
+        display: block;
+        width: 20px;
+        height: 20px;
+        pointer-events: none;
+    }
+    #gpt-mic.is-listening {
+        color: #fff;
+        background: #dc2626;
+        border-color: #f87171;
+        animation: gpt-mic-pulse 1s ease-in-out infinite;
+    }
+    #gpt-mic.is-processing {
+        color: #111827;
+        background: #fbbf24;
+        border-color: #fcd34d;
+    }
+    #gpt-mic.is-unavailable,
+    #gpt-mic:disabled {
+        color: #9ca3af;
+        background: #292929;
+        border-color: #444;
+        cursor: not-allowed;
+        opacity: 0.8;
+    }
+    @keyframes gpt-mic-pulse {
+        50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.2); }
+    }
     #gpt-send {
         width: 34px; height: 34px;
         border-radius: 10px;
@@ -215,7 +265,7 @@
     <div id="gpt-input-bar">
         <div id="gpt-error"></div>
         <div class="gpt-input-wrap">
-            <button id="gpt-mic" title="Dictar por voz" onclick="toggleMic()">
+            <button id="gpt-mic" type="button" title="Dictar por voz" aria-label="Dictar por voz" aria-pressed="false">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
                     <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
@@ -223,7 +273,7 @@
                 </svg>
             </button>
             <textarea id="gpt-prompt" placeholder="Pregunta lo que quieras" rows="1"></textarea>
-            <button id="gpt-send" onclick="gptSend()" title="Enviar">
+            <button id="gpt-send" type="button" onclick="gptSend()" title="Enviar">
                 <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M8 13V3M8 3L3.5 7.5M8 3L12.5 7.5" stroke="#212121" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
@@ -314,6 +364,7 @@
 
         let recognition;
         let isRecording = false;
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         window.toggleMic = function() {
             if (isRecording) {
@@ -321,19 +372,23 @@
                 return;
             }
 
-            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            if (!SpeechRecognition) {
                 showError('Tu navegador no soporta dictado por voz.');
+                setStatus('MICRÓFONO NO DISPONIBLE');
                 return;
             }
 
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRecognition();
             recognition.lang = 'es-MX';
             recognition.interimResults = true;
+            recognition.continuous = false;
 
             recognition.onstart = function() {
                 isRecording = true;
-                micBtn.style.color = '#ef4444';
+                micBtn.classList.remove('is-processing');
+                micBtn.classList.add('is-listening');
+                micBtn.setAttribute('aria-pressed', 'true');
+                micBtn.title = 'Detener dictado';
                 setStatus('ESCUCHANDO...');
             };
 
@@ -349,27 +404,50 @@
                     }
                 }
                 
+                const transcript = finalTranscript || interimTranscript;
+                if (transcript) promptEl.value = transcript;
+
                 if (finalTranscript) {
-                    promptEl.value += (promptEl.value ? ' ' : '') + finalTranscript;
+                    micBtn.classList.remove('is-listening');
+                    micBtn.classList.add('is-processing');
+                    setStatus('PROCESANDO VOZ...');
+                    promptEl.dispatchEvent(new Event('input', { bubbles: true }));
                 }
             };
 
             recognition.onerror = function(event) {
                 showError('Error en micrófono: ' + event.error);
                 isRecording = false;
-                micBtn.style.color = 'currentColor';
+                micBtn.classList.remove('is-listening', 'is-processing');
+                micBtn.setAttribute('aria-pressed', 'false');
+                micBtn.title = 'Dictar por voz';
                 setStatus('ERROR');
             };
 
             recognition.onend = function() {
                 isRecording = false;
-                micBtn.style.color = 'currentColor';
-                setStatus('');
+                micBtn.classList.remove('is-listening', 'is-processing');
+                micBtn.setAttribute('aria-pressed', 'false');
+                micBtn.title = 'Dictar por voz';
+                setStatus(promptEl.value.trim() ? 'VOZ LISTA PARA ENVIAR' : 'MICRÓFONO DISPONIBLE');
                 promptEl.focus();
             };
 
             recognition.start();
         };
+
+        micBtn.addEventListener('click', window.toggleMic);
+
+        if (SpeechRecognition) {
+            micBtn.classList.remove('is-unavailable');
+            micBtn.disabled = false;
+            setStatus('MICRÓFONO DISPONIBLE');
+        } else {
+            micBtn.classList.add('is-unavailable');
+            micBtn.disabled = true;
+            micBtn.title = 'Este navegador no soporta reconocimiento de voz';
+            setStatus('MICRÓFONO NO DISPONIBLE EN ESTE NAVEGADOR');
+        }
 
         window.gptSend = async function () {
             const text = promptEl.value.trim();
