@@ -20,11 +20,15 @@ class FakeRagBridgeService implements RagBridgeService
     public string $mode = self::MODE_SUCCESS;
 
     /** @var list<string> */
+    public array $queries = [];
+
+    /** @var list<string> */
     public array $tokens = ['Token ', 'determinista.'];
 
     public function stream(string $query, callable $onChunk): bool
     {
         $this->invocationCount++;
+        $this->queries[] = $query;
 
         if ($this->mode === self::MODE_EMPTY) {
             return true;

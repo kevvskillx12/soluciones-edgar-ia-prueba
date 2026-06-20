@@ -37,6 +37,22 @@ class GuardrailService
             }
         }
 
+        // 3. Solicitudes explícitas de falsificación documental o de datos
+        // personales ajenos. Las consultas legítimas sobre requisitos y trámites
+        // administrativos no coinciden con estos patrones.
+        $documentFraudPatterns = [
+            '/\b(hazme|genera|crea|fabrica|inventa)\b.{0,40}\b(curp|acta|rfc|nss|documentos?|identificacion)\b.{0,25}\b(fals[ao]s?|fraudulent[ao]s?)\b/u',
+            '/^\s*(una?\s+)?(curp|acta|rfc|nss|documentos?|identificacion)\b.{0,25}\b(fals[ao]s?|fraudulent[ao]s?)\b/u',
+            '/\b(como|ayudame a|quiero)\b.{0,30}\b(falsificar|falsifico|alterar)\b.{0,30}\b(curp|acta|rfc|nss|documentos?|identificacion)\b/u',
+            '/\bdame\b.{0,30}\bdatos personales reales\b.{0,30}\b(otra persona|tercero)\b/u',
+        ];
+
+        foreach ($documentFraudPatterns as $pattern) {
+            if (preg_match($pattern, $normalized) === 1) {
+                return true;
+            }
+        }
+
         return false;
     }
 
