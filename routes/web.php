@@ -153,6 +153,11 @@ Route::post('/ia-test', function () {
         }
 
         $memoryService->addUserMessage($conversation, $pregunta);
+        $procedureFlowResult = app(\App\Services\AI\ProcedureFlowService::class)
+            ->handle($conversation, $pregunta);
+        $procedureFlowResponse = $procedureFlowResult['handled']
+            ? $procedureFlowResult['response']
+            : null;
 
         // ── Helpers de extracción de contexto de pedidos ──────────────────────
         $findServiceByName = function (?string $serviceName) {
@@ -359,20 +364,23 @@ Route::post('/ia-test', function () {
             function () use (
                 $ragBridge, $memoryService, $conversation, $user,
                 $pregunta, $preguntaConContexto, $observability, $startTime,
-                $generateSimpleResponse, $conversationHistory
+                $generateSimpleResponse, $conversationHistory, $procedureFlowResponse
             ) {
                 $fullResponse          = '';
                 $ttftRecorded          = false;
                 $tokenCount            = 0;
                 $ttftMs                = null;
                 $activeGenerationStart = null;
-                $businessResponse      = $generateSimpleResponse(
+                $businessResponse = $procedureFlowResponse ?? $generateSimpleResponse(
                     $pregunta,
                     $conversationHistory,
                     $conversation,
                     $memoryService,
                     $user
                 );
+                $businessSource = $procedureFlowResponse !== null
+                    ? 'procedure_flow'
+                    : 'business_fallback';
 
                 $onChunk = function (array $data) use (
                     &$fullResponse, &$ttftRecorded, &$tokenCount,
@@ -436,7 +444,7 @@ Route::post('/ia-test', function () {
                 // Guardar mensaje asistente
                 try {
                     $memoryService->addAssistantMessage($conversation, $fullResponse, [
-                        'tool' => $success ? 'rag_stream' : ($businessResponse ? 'business_fallback' : 'rag_bridge_error'),
+                        'tool' => $success ? 'rag_stream' : ($businessResponse ? $businessSource : 'rag_bridge_error'),
                     ]);
                 } catch (\Throwable $e) {
                     \Illuminate\Support\Facades\Log::error('No se pudo guardar mensaje assistant: ' . $e->getMessage());
@@ -453,7 +461,7 @@ Route::post('/ia-test', function () {
                     'total_latency_ms'   => $totalLatencyMs,
                     'tokens_per_second'  => $tps,
                     'tools_executed'     => [
-                        'name'        => $success ? 'rag_search' : ($businessResponse ? 'business_fallback' : 'rag_bridge'),
+                        'name'        => $success ? 'rag_search' : ($businessResponse ? $businessSource : 'rag_bridge'),
                         'parameters'  => ['query' => $pregunta],
                         'status'      => $success || $businessResponse ? 'SUCCESS' : 'ERROR',
                         'duration_ms' => $totalLatencyMs,

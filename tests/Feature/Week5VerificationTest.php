@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\AiObservabilityLog;
+use App\Models\AiConversation;
+use App\Models\Service;
 use App\Services\AI\RagBridgeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -190,6 +192,21 @@ class Week5VerificationTest extends TestCase
     /** @test */
     public function conversation_context_preserves_kevin_and_curp_without_mixing_threads(): void
     {
+        Service::create([
+            'code' => 'CURP-01',
+            'name' => 'CURP Actualizada',
+            'description' => 'Ordenar solo con CURP',
+            'price' => 8,
+            'cost' => 5,
+            'service_type' => 'SERVICIOS',
+            'processing_time' => '5 Minutos',
+            'active_schedule' => '24/7',
+            'is_active' => true,
+            'form_schema' => [
+                ['name' => 'curp', 'label' => 'CURP', 'type' => 'text', 'required' => true],
+            ],
+        ]);
+
         $first = $this->postJson('/ia-test', [
             'pregunta' => 'Necesito un trámite de CURP para Kevin Montero',
         ]);
@@ -206,9 +223,10 @@ class Week5VerificationTest extends TestCase
         ]);
         $conversationB = $this->parseIaTestSse($third)['conversation_id'];
 
-        $this->assertStringContainsString('Kevin Montero', $this->fakeRagBridge->queries[1]);
-        $this->assertStringContainsString('CURP', $this->fakeRagBridge->queries[1]);
+        $stateA = AiConversation::where('conversation_id', $conversationA)->first()->metadata['procedure_flow'];
+        $this->assertSame('Kevin Montero', $stateA['subject_name']);
+        $this->assertSame('CURP', $stateA['service_name']);
         $this->assertNotEquals($conversationA, $conversationB);
-        $this->assertStringNotContainsString('Kevin Montero', $this->fakeRagBridge->queries[2]);
+        $this->assertStringNotContainsString('Kevin Montero', $this->fakeRagBridge->queries[0]);
     }
 }
