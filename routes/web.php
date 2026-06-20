@@ -154,10 +154,12 @@ Route::post('/ia-test', function () {
 
         $memoryService->addUserMessage($conversation, $pregunta);
         $procedureFlowResult = app(\App\Services\AI\ProcedureFlowService::class)
-            ->handle($conversation, $pregunta);
+            ->handle($conversation, $pregunta, $user);
         $procedureFlowResponse = $procedureFlowResult['handled']
             ? $procedureFlowResult['response']
             : null;
+        $procedureFlowToolStatus = $procedureFlowResult['tool_status'] ?? 'SUCCESS';
+        $procedureFlowOrderId = $procedureFlowResult['order_id'] ?? null;
 
         // ── Helpers de extracción de contexto de pedidos ──────────────────────
         $findServiceByName = function (?string $serviceName) {
@@ -364,7 +366,8 @@ Route::post('/ia-test', function () {
             function () use (
                 $ragBridge, $memoryService, $conversation, $user,
                 $pregunta, $preguntaConContexto, $observability, $startTime,
-                $generateSimpleResponse, $conversationHistory, $procedureFlowResponse
+                $generateSimpleResponse, $conversationHistory, $procedureFlowResponse,
+                $procedureFlowToolStatus, $procedureFlowOrderId
             ) {
                 $fullResponse          = '';
                 $ttftRecorded          = false;
@@ -455,17 +458,24 @@ Route::post('/ia-test', function () {
                 $generationTime = $activeGenerationStart ? (microtime(true) - $activeGenerationStart) : ($totalLatencyMs / 1000);
                 $tps            = $generationTime > 0 ? round($tokenCount / $generationTime, 2) : 0;
 
+                $toolDetails = [
+                    'name'        => $success ? 'rag_search' : ($businessResponse ? $businessSource : 'rag_bridge'),
+                    'parameters'  => ['query' => $pregunta],
+                    'status'      => $businessSource === 'procedure_flow'
+                        ? $procedureFlowToolStatus
+                        : ($success || $businessResponse ? 'SUCCESS' : 'ERROR'),
+                    'duration_ms' => $totalLatencyMs,
+                ];
+                if ($procedureFlowOrderId) {
+                    $toolDetails['order_id'] = $procedureFlowOrderId;
+                }
+
                 $observability->update([
                     'system_response'    => $fullResponse,
                     'ttft_ms'            => $ttftMs,
                     'total_latency_ms'   => $totalLatencyMs,
                     'tokens_per_second'  => $tps,
-                    'tools_executed'     => [
-                        'name'        => $success ? 'rag_search' : ($businessResponse ? $businessSource : 'rag_bridge'),
-                        'parameters'  => ['query' => $pregunta],
-                        'status'      => $success || $businessResponse ? 'SUCCESS' : 'ERROR',
-                        'duration_ms' => $totalLatencyMs,
-                    ],
+                    'tools_executed'     => $toolDetails,
                     'was_blocked' => false,
                 ]);
 

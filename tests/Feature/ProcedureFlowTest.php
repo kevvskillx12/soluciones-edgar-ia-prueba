@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\AiConversation;
+use App\Models\Order;
 use App\Models\Service;
+use App\Models\User;
 use App\Services\AI\RagBridgeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\FakeRagBridgeService;
@@ -16,6 +18,7 @@ class ProcedureFlowTest extends TestCase
     use RefreshDatabase;
 
     private FakeRagBridgeService $fakeRagBridge;
+    private User $admin;
 
     protected function setUp(): void
     {
@@ -23,6 +26,11 @@ class ProcedureFlowTest extends TestCase
 
         $this->fakeRagBridge = new FakeRagBridgeService;
         $this->app->instance(RagBridgeService::class, $this->fakeRagBridge);
+        $this->admin = User::factory()->create([
+            'is_admin' => true,
+            'balance' => 0,
+        ]);
+        $this->actingAs($this->admin);
 
         Service::create([
             'code' => 'CURP-01',
@@ -165,12 +173,142 @@ class ProcedureFlowTest extends TestCase
         $this->assertNull($this->state($conversationB)['subject_name'] ?? null);
     }
 
+    public function test_confirmation_with_continua_creates_a_real_order(): void
+    {
+        $this->assertOrderCreatedByConfirmation('continua');
+    }
+
+    public function test_confirmation_with_si_hazlo_creates_a_real_order(): void
+    {
+        $this->assertOrderCreatedByConfirmation('si hazlo');
+    }
+
+    public function test_confirmation_with_termina_la_solicitud_creates_a_real_order(): void
+    {
+        $this->assertOrderCreatedByConfirmation('Termina la solicitud');
+    }
+
+    public function test_created_order_can_be_queried_and_is_not_duplicated(): void
+    {
+        $conversationId = $this->startActaFlowReadyToConfirm();
+        $created = $this->send('si, continúa', $conversationId);
+        $orderId = $this->state($conversationId)['order_id'];
+
+        $this->assertStringContainsString("solicitud #{$orderId}", $created['respuesta']);
+        $this->assertDatabaseCount('orders', 1);
+
+        $status = $this->send('¿ya la hiciste?', $conversationId);
+        $this->assertStringContainsString("solicitud #{$orderId}", $status['respuesta']);
+
+        $duplicate = $this->send('continúa', $conversationId);
+        $this->assertStringContainsString("solicitud #{$orderId}", $duplicate['respuesta']);
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertSame(0, $this->fakeRagBridge->invocationCount);
+    }
+
+    public function test_cancel_ready_flow_does_not_create_order(): void
+    {
+        $conversationId = $this->startActaFlowReadyToConfirm();
+        $parsed = $this->send('mejor no', $conversationId);
+
+        $this->assertStringContainsString('Cancelé el trámite', $parsed['respuesta']);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertSame('cancelled', $this->state($conversationId)['status']);
+    }
+
+    public function test_separate_conversations_do_not_share_order_ids(): void
+    {
+        $conversationA = $this->startActaFlowReadyToConfirm('Kevin Montero');
+        $this->send('procede', $conversationA);
+        $orderA = $this->state($conversationA)['order_id'];
+
+        $conversationB = $this->startActaFlowReadyToConfirm('Ana López');
+        $this->send('hazlo', $conversationB);
+        $orderB = $this->state($conversationB)['order_id'];
+
+        $this->assertNotEquals($conversationA, $conversationB);
+        $this->assertNotEquals($orderA, $orderB);
+        $this->assertDatabaseCount('orders', 2);
+    }
+
+    public function test_confirmation_without_authenticated_user_reports_requirement(): void
+    {
+        auth()->logout();
+        $conversationId = $this->startActaFlowReadyToConfirm();
+        $parsed = $this->send('continua', $conversationId);
+
+        $this->assertStringContainsString('necesito que inicies sesión', $parsed['respuesta']);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertSame('ready_to_confirm', $this->state($conversationId)['status']);
+        $this->assertDatabaseHas('ai_observability_logs', [
+            'session_id' => $conversationId,
+            'was_blocked' => false,
+        ]);
+        $this->assertSame(
+            'ERROR',
+            \App\Models\AiObservabilityLog::latest('id')->first()->tools_executed['status']
+        );
+    }
+
+    public function test_confirmation_with_insufficient_balance_does_not_create_order(): void
+    {
+        $user = User::factory()->create([
+            'is_admin' => false,
+            'balance' => 0,
+        ]);
+        $this->actingAs($user);
+
+        $conversationId = $this->startActaFlowReadyToConfirm();
+        $parsed = $this->send('procede', $conversationId);
+
+        $this->assertStringContainsString('necesitas saldo suficiente', $parsed['respuesta']);
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertSame('ready_to_confirm', $this->state($conversationId)['status']);
+        $this->assertSame(
+            'ERROR',
+            \App\Models\AiObservabilityLog::latest('id')->first()->tools_executed['status']
+        );
+    }
+
     private function startCurpFlow(): string
     {
         $first = $this->send('Necesito un trámite para Kevin Montero');
         $this->send('quiero de una CURP', $first['conversation_id']);
 
         return $first['conversation_id'];
+    }
+
+    private function startActaFlowReadyToConfirm(string $subject = 'Kevin Montero'): string
+    {
+        $first = $this->send("Quiero un trámite para {$subject}");
+        $this->send('acta de nacimiento', $first['conversation_id']);
+        $this->send('ABCD010203HYNXXX09', $first['conversation_id']);
+
+        return $first['conversation_id'];
+    }
+
+    private function assertOrderCreatedByConfirmation(string $confirmation): void
+    {
+        $conversationId = $this->startActaFlowReadyToConfirm();
+        $parsed = $this->send($confirmation, $conversationId);
+        $state = $this->state($conversationId);
+
+        $this->assertStringContainsString('Listo. Creé la solicitud #', $parsed['respuesta']);
+        $this->assertStringContainsString('Quedó en estado pendiente', $parsed['respuesta']);
+        $this->assertSame('completed', $state['status']);
+        $this->assertNotNull($state['order_id']);
+        $this->assertDatabaseHas('orders', [
+            'id' => $state['order_id'],
+            'user_id' => $this->admin->id,
+            'service_id' => $state['service_id'],
+            'status' => 'pending',
+        ]);
+
+        $order = Order::findOrFail($state['order_id']);
+        $this->assertSame('Kevin Montero', $order->input_data['subject_name']);
+        $this->assertSame('ABCD010203HYNXXX09', $order->input_data['curp']);
+        $this->assertSame(0.0, (float) $order->price_at_purchase);
+        $this->assertSame(0, $this->fakeRagBridge->invocationCount);
     }
 
     private function send(string $prompt, ?string $conversationId = null): array

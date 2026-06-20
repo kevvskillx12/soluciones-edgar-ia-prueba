@@ -3,8 +3,11 @@
 namespace App\Services\AI;
 
 use App\Models\AiConversation;
+use App\Models\Order;
 use App\Models\Service;
+use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ProcedureFlowService
@@ -12,10 +15,33 @@ class ProcedureFlowService
     /**
      * @return array{handled: bool, response: ?string, state: ?array}
      */
-    public function handle(AiConversation $conversation, string $prompt): array
+    public function handle(AiConversation $conversation, string $prompt, ?User $user = null): array
     {
         $state = $this->getState($conversation);
         $normalized = $this->normalize($prompt);
+
+        $creationStatusResponse = $this->answerCreationStatusQuestion($normalized, $state);
+        if ($creationStatusResponse !== null) {
+            return $this->handled($creationStatusResponse, $state);
+        }
+
+        if (($state['status'] ?? null) === 'completed' && $this->isConfirmation($normalized)) {
+            return $this->handled($this->completedResponse($state), $state);
+        }
+
+        if (($state['status'] ?? null) === 'ready_to_confirm') {
+            if ($this->isCancellation($normalized)) {
+                $state['status'] = 'cancelled';
+                $state['current_field'] = null;
+                $this->persistState($conversation, $state, false);
+
+                return $this->handled('Entendido. Cancelé el trámite antes de crear la solicitud.', $state);
+            }
+
+            if ($this->isConfirmation($normalized)) {
+                return $this->createOrder($conversation, $state, $user);
+            }
+        }
 
         if ($this->matches($normalized, [
             'cancela este tramite',
@@ -202,6 +228,124 @@ class ProcedureFlowService
         return "El trámite era para {$subject}.";
     }
 
+    private function answerCreationStatusQuestion(string $normalized, ?array $state): ?string
+    {
+        if (!$this->matches($normalized, [
+            'ya la hiciste',
+            'creaste la solicitud',
+            'creaste el pedido',
+            'cual es el folio',
+            'cual es la solicitud',
+            'ya fue creada',
+        ])) {
+            return null;
+        }
+
+        if (!$state) {
+            return 'No hay una solicitud registrada en esta conversación.';
+        }
+
+        if (($state['status'] ?? null) === 'completed' && !empty($state['order_id'])) {
+            return $this->completedResponse($state);
+        }
+
+        if (($state['status'] ?? null) === 'ready_to_confirm') {
+            return 'Ya tengo todos los datos, pero falta tu confirmación para crear la solicitud.';
+        }
+
+        if (($state['status'] ?? null) === 'collecting') {
+            $labels = $this->missingLabels($state);
+            return 'Todavía no se crea la solicitud. Falta capturar: ' . implode(', ', $labels) . '.';
+        }
+
+        if (($state['status'] ?? null) === 'cancelled') {
+            return 'El trámite fue cancelado y no se creó ninguna solicitud.';
+        }
+
+        return 'La solicitud todavía no ha sido creada.';
+    }
+
+    private function createOrder(AiConversation $conversation, array $state, ?User $user): array
+    {
+        if (!empty($state['order_id'])) {
+            $state['status'] = 'completed';
+            $this->persistState($conversation, $state, false);
+
+            return $this->handled($this->completedResponse($state), $state);
+        }
+
+        if (!$user) {
+            $state['last_error'] = 'authentication_required';
+            $this->persistState($conversation, $state);
+
+            return $this->handled(
+                'Ya tengo los datos, pero necesito que inicies sesión para crear la solicitud.',
+                $state,
+                'ERROR'
+            );
+        }
+
+        $service = Service::find($state['service_id'] ?? null);
+        if (!$service) {
+            $state['last_error'] = 'service_not_found';
+            $this->persistState($conversation, $state);
+
+            return $this->handled(
+                'Ya tengo los datos, pero el servicio ya no está disponible en el catálogo.',
+                $state,
+                'ERROR'
+            );
+        }
+
+        if (!$user->is_admin && (float) $user->balance < (float) $service->price) {
+            $state['last_error'] = 'insufficient_balance';
+            $this->persistState($conversation, $state);
+
+            return $this->handled(
+                "Ya tengo los datos, pero necesitas saldo suficiente antes de crear la orden. "
+                . "Costo: \${$service->price}. Saldo disponible: \${$user->balance}.",
+                $state,
+                'ERROR'
+            );
+        }
+
+        try {
+            $order = DB::transaction(function () use ($user, $service, $state) {
+                return Order::create([
+                    'user_id' => $user->id,
+                    'service_id' => $service->id,
+                    'input_data' => array_merge(
+                        $state['collected_fields'] ?? [],
+                        ['subject_name' => $state['subject_name']]
+                    ),
+                    'status' => 'pending',
+                    'price_at_purchase' => $service->price,
+                    'admin_notes' => "Solicitud creada desde AI Chat para {$state['subject_name']}.",
+                ]);
+            });
+
+            $state['status'] = 'completed';
+            $state['order_id'] = $order->id;
+            $state['order_status'] = $order->status;
+            $state['completed_at'] = now()->toDateTimeString();
+            $state['last_error'] = null;
+            $this->persistState($conversation, $state, false);
+
+            return $this->handled($this->completedResponse($state, true), $state, 'SUCCESS', $order->id);
+        } catch (\Throwable $exception) {
+            report($exception);
+            $state['last_error'] = 'order_creation_failed';
+            $this->persistState($conversation, $state);
+
+            return $this->handled(
+                'Ya tengo los datos, pero no pude crear la solicitud de forma segura. '
+                . 'Verifica el saldo y vuelve a intentarlo.',
+                $state,
+                'ERROR'
+            );
+        }
+    }
+
     private function availableServices(): Collection
     {
         return Service::query()
@@ -359,6 +503,17 @@ class ProcedureFlowService
             . "{$state['subject_name']}: {$details}. ¿Deseas continuar con la solicitud?";
     }
 
+    private function completedResponse(array $state, bool $justCreated = false): string
+    {
+        $prefix = $justCreated ? 'Listo. Creé' : 'Sí. Ya fue creada';
+        $orderId = $state['order_id'];
+        $service = $state['service_name'];
+        $subject = $state['subject_name'];
+
+        return "{$prefix} la solicitud #{$orderId} para el trámite {$service} de {$subject}. "
+            . 'Quedó en estado pendiente.';
+    }
+
     private function serviceQuestion(Collection $services): string
     {
         if ($services->isEmpty()) {
@@ -430,6 +585,10 @@ class ProcedureFlowService
             'missing_fields' => [],
             'current_field' => null,
             'status' => 'awaiting_service',
+            'order_id' => null,
+            'order_status' => null,
+            'completed_at' => null,
+            'last_error' => null,
         ];
     }
 
@@ -471,13 +630,48 @@ class ProcedureFlowService
         return false;
     }
 
-    private function handled(string $response, ?array $state): array
+    private function isConfirmation(string $normalized): bool
     {
-        return ['handled' => true, 'response' => $response, 'state' => $state];
+        if ($normalized === 'si') {
+            return true;
+        }
+
+        return preg_match(
+            '/\b(continua|deseo continuar|continuar solicitud|procede|termina la solicitud|hazlo|termina y procede)\b/u',
+            $normalized
+        ) === 1;
+    }
+
+    private function isCancellation(string $normalized): bool
+    {
+        return $normalized === 'no'
+            || preg_match('/\b(cancelar|cancela|no continuar|mejor no)\b/u', $normalized) === 1;
+    }
+
+    private function handled(
+        string $response,
+        ?array $state,
+        string $toolStatus = 'SUCCESS',
+        ?int $orderId = null
+    ): array
+    {
+        return [
+            'handled' => true,
+            'response' => $response,
+            'state' => $state,
+            'tool_status' => $toolStatus,
+            'order_id' => $orderId ?? ($state['order_id'] ?? null),
+        ];
     }
 
     private function notHandled(): array
     {
-        return ['handled' => false, 'response' => null, 'state' => null];
+        return [
+            'handled' => false,
+            'response' => null,
+            'state' => null,
+            'tool_status' => null,
+            'order_id' => null,
+        ];
     }
 }
