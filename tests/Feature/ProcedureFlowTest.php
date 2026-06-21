@@ -54,6 +54,46 @@ class ProcedureFlowTest extends TestCase
         ]);
 
         Service::create([
+            'code' => 'EXP-INT',
+            'name' => 'Expediente Integral',
+            'description' => 'Servicio de prueba con campos dinámicos',
+            'price' => 20,
+            'cost' => 10,
+            'service_type' => 'SERVICIOS',
+            'processing_time' => '5 Minutos',
+            'active_schedule' => '24/7',
+            'is_active' => true,
+            'form_schema' => [
+                ['name' => 'nombre_completo', 'label' => 'Nombre Completo', 'type' => 'text', 'required' => true],
+                ['name' => 'curp', 'label' => 'CURP', 'type' => 'text', 'required' => true],
+                ['name' => 'telefono', 'label' => 'Teléfono', 'type' => 'text', 'required' => true],
+                ['name' => 'correo', 'label' => 'Correo', 'type' => 'email', 'required' => true],
+            ],
+        ]);
+
+        Service::create([
+            'code' => 'DAT-SEL',
+            'name' => 'Datos Demográficos',
+            'description' => 'Servicio de prueba con fecha y opción',
+            'price' => 20,
+            'cost' => 10,
+            'service_type' => 'SERVICIOS',
+            'processing_time' => '5 Minutos',
+            'active_schedule' => '24/7',
+            'is_active' => true,
+            'form_schema' => [
+                ['name' => 'fecha_nacimiento', 'label' => 'Fecha de Nacimiento', 'type' => 'date', 'required' => true],
+                [
+                    'name' => 'estado',
+                    'label' => 'Estado',
+                    'type' => 'select',
+                    'required' => true,
+                    'options' => ['Yucatán', 'Quintana Roo'],
+                ],
+            ],
+        ]);
+
+        Service::create([
             'code' => 'ACT-NAC',
             'name' => 'Acta de Nacimiento',
             'description' => 'Ordenar solo con CURP',
@@ -65,6 +105,28 @@ class ProcedureFlowTest extends TestCase
             'is_active' => true,
             'form_schema' => [
                 ['name' => 'curp', 'label' => 'CURP', 'type' => 'text', 'required' => true],
+            ],
+        ]);
+
+        Service::create([
+            'code' => 'CSF-02',
+            'name' => 'CSF con RFC y IDCIF',
+            'description' => 'Constancia de situación fiscal',
+            'price' => 55,
+            'cost' => 38.5,
+            'service_type' => 'SAT',
+            'processing_time' => '5 Minutos',
+            'active_schedule' => '24/7',
+            'is_active' => true,
+            'form_schema' => [
+                [
+                    'name' => 'rfc',
+                    'label' => 'RFC',
+                    'type' => 'text',
+                    'required' => true,
+                    'regex' => '/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/',
+                ],
+                ['name' => 'idcif', 'label' => 'IDCIF', 'type' => 'text', 'required' => true],
             ],
         ]);
     }
@@ -274,7 +336,10 @@ class ProcedureFlowTest extends TestCase
     {
         $parsed = $this->send('hola');
 
-        $this->assertSame('Hola. ¿Qué trámite necesitas realizar?', $parsed['respuesta']);
+        $this->assertSame(
+            'Hola. Estoy listo para ayudarte con trámites. ¿Qué trámite necesitas realizar?',
+            $parsed['respuesta']
+        );
         $this->assertStringNotContainsString('Acta de Nacimiento', $parsed['respuesta']);
         $this->assertStringNotContainsString('Tramitar Una', $parsed['respuesta']);
         $this->assertSame(0, $this->fakeRagBridge->invocationCount);
@@ -346,12 +411,177 @@ class ProcedureFlowTest extends TestCase
         ]));
 
         $this->assertNotSame($first['conversation_id'], $second['conversation_id']);
-        $this->assertSame('Hola. ¿Qué trámite necesitas realizar?', $second['respuesta']);
+        $this->assertSame(
+            'Hola. Estoy listo para ayudarte con trámites. ¿Qué trámite necesitas realizar?',
+            $second['respuesta']
+        );
         $this->assertNull(
             AiConversation::where('conversation_id', $second['conversation_id'])
                 ->firstOrFail()
                 ->metadata['procedure_flow'] ?? null
         );
+    }
+
+    /**
+     * @dataProvider naturalCurpMessages
+     */
+    public function test_curp_accepts_natural_capture_formats(string $message): void
+    {
+        $conversationId = $this->startCurpFlow();
+        $parsed = $this->send($message, $conversationId);
+
+        $this->assertStringContainsString('datos necesarios', $parsed['respuesta']);
+        $this->assertSame('EXPL050202HYNKCSA0', $this->state($conversationId)['collected_fields']['curp']);
+    }
+
+    public static function naturalCurpMessages(): array
+    {
+        return [
+            ['EXPL050202HYNKCSA0'],
+            ['El curp es EXPL050202HYNKCSA0'],
+            ['mi curp es EXPL050202HYNKCSA0'],
+            ['CURP: EXPL050202HYNKCSA0'],
+            ['te paso la curp EXPL050202HYNKCSA0'],
+            ['es EXPL050202HYNKCSA0'],
+            ['la tengo como EXPL050202HYNKCSA0'],
+        ];
+    }
+
+    public function test_invalid_curp_is_not_saved(): void
+    {
+        $conversationId = $this->startCurpFlow();
+        $parsed = $this->send('mi curp es dato-invalido', $conversationId);
+
+        $this->assertStringContainsString('No pude identificar un valor válido', $parsed['respuesta']);
+        $this->assertArrayNotHasKey('curp', $this->state($conversationId)['collected_fields']);
+    }
+
+    public function test_multiple_dynamic_fields_are_captured_from_one_message(): void
+    {
+        $first = $this->send('Necesito Expediente Integral para Kevin Montero');
+        $parsed = $this->send(
+            'Soy Kevin Montero, mi CURP es EXPL050202HYNKCSA0, mi teléfono es 9991234567 y correo kevin@test.com',
+            $first['conversation_id']
+        );
+        $state = $this->state($first['conversation_id']);
+
+        $this->assertSame('ready_to_confirm', $state['status']);
+        $this->assertSame('Kevin Montero', $state['collected_fields']['nombre_completo']);
+        $this->assertSame('EXPL050202HYNKCSA0', $state['collected_fields']['curp']);
+        $this->assertSame('9991234567', $state['collected_fields']['telefono']);
+        $this->assertSame('kevin@test.com', $state['collected_fields']['correo']);
+        $this->assertStringContainsString('datos necesarios', $parsed['respuesta']);
+    }
+
+    public function test_date_and_select_options_are_normalized_from_natural_text(): void
+    {
+        $first = $this->send('Necesito Datos Demográficos para Kevin Montero');
+        $parsed = $this->send(
+            'Nací el 02/02/2005 y el estado es yucatan',
+            $first['conversation_id']
+        );
+        $state = $this->state($first['conversation_id']);
+
+        $this->assertSame('2005-02-02', $state['collected_fields']['fecha_nacimiento']);
+        $this->assertSame('Yucatán', $state['collected_fields']['estado']);
+        $this->assertSame('ready_to_confirm', $state['status']);
+        $this->assertStringContainsString('datos necesarios', $parsed['respuesta']);
+    }
+
+    public function test_iso_date_is_accepted_and_unknown_option_is_rejected(): void
+    {
+        $first = $this->send('Necesito Datos Demográficos para Kevin Montero');
+        $this->send('fecha de nacimiento: 2005-02-02', $first['conversation_id']);
+        $parsed = $this->send('estado: Campeche', $first['conversation_id']);
+        $state = $this->state($first['conversation_id']);
+
+        $this->assertSame('2005-02-02', $state['collected_fields']['fecha_nacimiento']);
+        $this->assertArrayNotHasKey('estado', $state['collected_fields']);
+        $this->assertStringContainsString('No pude identificar un valor válido', $parsed['respuesta']);
+    }
+
+    public function test_correction_replaces_previously_captured_value(): void
+    {
+        $conversationId = $this->startCurpFlow();
+        $this->send('ABCD010203HYNXXX09', $conversationId);
+        $parsed = $this->send(
+            'me equivoqué, la CURP correcta es EXPL050202HYNKCSA0',
+            $conversationId
+        );
+
+        $this->assertSame('EXPL050202HYNKCSA0', $this->state($conversationId)['collected_fields']['curp']);
+        $this->assertStringContainsString('CURP EXPL050202HYNKCSA0', $parsed['respuesta']);
+    }
+
+    public function test_combined_service_person_and_curp_reaches_confirmation_in_one_message(): void
+    {
+        $parsed = $this->send(
+            'Necesito acta de nacimiento para Kevin Montero, CURP EXPL050202HYNKCSA0'
+        );
+        $state = $this->state($parsed['conversation_id']);
+
+        $this->assertSame('Kevin Montero', $state['subject_name']);
+        $this->assertSame('EXPL050202HYNKCSA0', $state['collected_fields']['curp']);
+        $this->assertSame('ready_to_confirm', $state['status']);
+    }
+
+    public function test_completed_flow_returns_data_summary_and_never_duplicates_order(): void
+    {
+        $conversationId = $this->startActaFlowReadyToConfirm();
+        $this->send('si hazlo', $conversationId);
+        $orderId = $this->state($conversationId)['order_id'];
+
+        $summary = $this->send('datos del último trámite', $conversationId);
+        $this->assertStringContainsString('CURP: ABCD010203HYNXXX09', $summary['respuesta']);
+
+        $this->send('continúa', $conversationId);
+        $this->send('si hazlo', $conversationId);
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertSame($orderId, $this->state($conversationId)['order_id']);
+        $this->assertSame('completed', $this->state($conversationId)['status']);
+    }
+
+    /**
+     * @dataProvider smalltalkPrompts
+     */
+    public function test_smalltalk_is_handled_without_rejection_or_llm(string $prompt): void
+    {
+        $parsed = $this->send($prompt);
+
+        $this->assertStringContainsString('Estoy listo para ayudarte con trámites', $parsed['respuesta']);
+        $this->assertStringNotContainsString('Lo siento', $parsed['respuesta']);
+        $this->assertSame(0, $this->fakeRagBridge->invocationCount);
+    }
+
+    public static function smalltalkPrompts(): array
+    {
+        return [['hola'], ['Hola cómo estás'], ['buenos días'], ['qué tal']];
+    }
+
+    /**
+     * @dataProvider legitimateFiscalPrompts
+     */
+    public function test_legitimate_fiscal_prompts_enter_structured_flow(string $prompt): void
+    {
+        $parsed = $this->send($prompt);
+        $state = $this->state($parsed['conversation_id']);
+
+        $this->assertSame('CSF-02', $state['service_code']);
+        $this->assertStringContainsString('¿Para quién es el trámite?', $parsed['respuesta']);
+        $this->assertSame(0, $this->fakeRagBridge->invocationCount);
+    }
+
+    public static function legitimateFiscalPrompts(): array
+    {
+        return [
+            ['para rfc'],
+            ['consulta de rfc'],
+            ['quiero consultar RFC'],
+            ['descarga de constancia'],
+            ['constancia fiscal'],
+            ['constancia de situación fiscal'],
+            ['quiero descargar mi constancia fiscal'],
+        ];
     }
 
     private function startCurpFlow(): string

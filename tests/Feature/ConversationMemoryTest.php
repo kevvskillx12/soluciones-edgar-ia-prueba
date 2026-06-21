@@ -5,7 +5,10 @@ namespace Tests\Feature;
 use App\Models\AiConversation;
 use App\Models\AiMessage;
 use App\Models\User;
+use App\Models\Service;
+use App\Services\AI\RagBridgeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\FakeRagBridgeService;
 use Tests\Support\ParsesIaTestSse;
 use Tests\TestCase;
 
@@ -13,6 +16,31 @@ class ConversationMemoryTest extends TestCase
 {
     use ParsesIaTestSse;
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->app->instance(RagBridgeService::class, new FakeRagBridgeService);
+
+        Service::create([
+            'code' => 'CURP-01',
+            'name' => 'CURP Actualizada',
+            'description' => 'Ordenar solo con CURP',
+            'price' => 8,
+            'cost' => 5,
+            'service_type' => 'SERVICIOS',
+            'processing_time' => '5 Minutos',
+            'active_schedule' => '24/7',
+            'is_active' => true,
+            'form_schema' => [[
+                'name' => 'curp',
+                'label' => 'CURP',
+                'type' => 'text',
+                'required' => true,
+                'regex' => '/^[A-Z]{4}\d{6}[HM][A-Z]{2}[A-Z]{3}[A-Z0-9]{2}$/',
+            ]],
+        ]);
+    }
 
     public function test_creates_conversation_id_if_not_provided(): void
     {
@@ -207,5 +235,119 @@ class ConversationMemoryTest extends TestCase
 
         $toolMessages = $messages->where('role', 'tool');
         $this->assertCount(0, $toolMessages);
+    }
+
+    public function test_conversation_title_uses_first_message_then_procedure_state(): void
+    {
+        $user = User::factory()->create(['is_admin' => true]);
+        $this->actingAs($user);
+
+        $generic = $this->parseIaTestSse($this->postJson('/ia-test', [
+            'pregunta' => 'Necesito orientación administrativa general',
+        ]));
+        $genericConversation = AiConversation::where('conversation_id', $generic['conversation_id'])->firstOrFail();
+        $this->assertStringStartsWith('Necesito orientación administrativa', $genericConversation->title);
+
+        $procedure = $this->parseIaTestSse($this->postJson('/ia-test', [
+            'pregunta' => 'Curp para Luis Ek',
+        ]));
+        $procedureConversation = AiConversation::where('conversation_id', $procedure['conversation_id'])->firstOrFail();
+        $this->assertSame('CURP para Luis Ek', $procedureConversation->title);
+    }
+
+    public function test_completed_conversation_title_includes_order_id(): void
+    {
+        $user = User::factory()->create(['is_admin' => true]);
+        $this->actingAs($user);
+
+        $first = $this->parseIaTestSse($this->postJson('/ia-test', [
+            'pregunta' => 'Curp para Luis Ek',
+        ]));
+        $conversationId = $first['conversation_id'];
+        $this->parseIaTestSse($this->postJson('/ia-test', [
+            'pregunta' => 'EXPL050202HYNKCSA0',
+            'conversation_id' => $conversationId,
+        ]));
+        $this->parseIaTestSse($this->postJson('/ia-test', [
+            'pregunta' => 'si hazlo',
+            'conversation_id' => $conversationId,
+        ]));
+
+        $conversation = AiConversation::where('conversation_id', $conversationId)->firstOrFail();
+        $orderId = $conversation->metadata['procedure_flow']['order_id'];
+        $this->assertSame("CURP para Luis Ek · Solicitud #{$orderId}", $conversation->title);
+
+        $status = $this->parseIaTestSse($this->postJson('/ia-test', [
+            'pregunta' => 'Cuál fue el último trámite que hice',
+            'conversation_id' => $conversationId,
+        ]));
+        $this->assertStringContainsString('CURP', $status['respuesta']);
+        $this->assertStringContainsString('Luis Ek', $status['respuesta']);
+        $this->assertStringContainsString("Solicitud #{$orderId}", $status['respuesta']);
+    }
+
+    public function test_history_lists_only_authenticated_users_conversations(): void
+    {
+        $userA = User::factory()->create();
+        $userB = User::factory()->create();
+        AiConversation::create(['conversation_id' => 'conv_a', 'user_id' => $userA->id, 'channel' => 'admin_chat', 'title' => 'Chat A']);
+        AiConversation::create(['conversation_id' => 'conv_b', 'user_id' => $userB->id, 'channel' => 'admin_chat', 'title' => 'Chat B']);
+
+        $this->actingAs($userA)
+            ->getJson('/ia-conversations')
+            ->assertOk()
+            ->assertJsonCount(1, 'conversations')
+            ->assertJsonPath('conversations.0.conversation_id', 'conv_a');
+    }
+
+    public function test_can_load_own_conversation_with_messages_and_metadata(): void
+    {
+        $user = User::factory()->create();
+        $conversation = AiConversation::create([
+            'conversation_id' => 'conv_history',
+            'user_id' => $user->id,
+            'channel' => 'admin_chat',
+            'title' => 'Consulta RFC',
+            'metadata' => ['procedure_flow' => ['status' => 'collecting']],
+        ]);
+        $conversation->messages()->create(['role' => 'user', 'content' => 'consulta de rfc']);
+
+        $this->actingAs($user)
+            ->getJson('/ia-conversations/conv_history')
+            ->assertOk()
+            ->assertJsonPath('title', 'Consulta RFC')
+            ->assertJsonPath('messages.0.content', 'consulta de rfc')
+            ->assertJsonPath('metadata.procedure_flow.status', 'collecting');
+    }
+
+    public function test_user_cannot_load_another_users_conversation(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        AiConversation::create([
+            'conversation_id' => 'conv_private',
+            'user_id' => $owner->id,
+            'channel' => 'admin_chat',
+            'title' => 'Privado',
+        ]);
+
+        $this->actingAs($other)
+            ->getJson('/ia-conversations/conv_private')
+            ->assertNotFound();
+    }
+
+    public function test_loaded_incomplete_conversation_can_continue(): void
+    {
+        $user = User::factory()->create(['is_admin' => true]);
+        $this->actingAs($user);
+        $first = $this->parseIaTestSse($this->postJson('/ia-test', ['pregunta' => 'Curp para Luis Ek']));
+
+        $loaded = $this->getJson('/ia-conversations/' . $first['conversation_id'])->assertOk()->json();
+        $continued = $this->parseIaTestSse($this->postJson('/ia-test', [
+            'pregunta' => 'EXPL050202HYNKCSA0',
+            'conversation_id' => $loaded['conversation_id'],
+        ]));
+
+        $this->assertStringContainsString('datos necesarios', $continued['respuesta']);
     }
 }

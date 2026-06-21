@@ -4,14 +4,20 @@ namespace App\Services\AI;
 
 use App\Models\AiConversation;
 use App\Models\Service;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class ConversationMemoryService
 {
     public function startOrResume(?string $conversationId, $user = null, string $channel = 'admin_chat'): AiConversation
     {
         if ($conversationId) {
-            $conversation = AiConversation::with('messages')->where('conversation_id', $conversationId)->first();
+            $conversation = AiConversation::with('messages')
+                ->where('conversation_id', $conversationId)
+                ->where('user_id', $user?->id)
+                ->first();
             if ($conversation) {
                 $metadata = $conversation->metadata ?? [];
                 if (isset($metadata['status']) && $metadata['status'] === 'completed') {
@@ -23,7 +29,7 @@ class ConversationMemoryService
         }
 
         $conversation = AiConversation::create([
-            'conversation_id' => $conversationId ?? 'conv_' . uniqid(),
+            'conversation_id' => 'conv_' . uniqid(),
             'user_id' => $user ? $user->id : null,
             'channel' => $channel,
         ]);
@@ -34,11 +40,13 @@ class ConversationMemoryService
     public function addUserMessage(AiConversation $conversation, string $content): void
     {
         $this->saveMessage($conversation, 'user', $content);
+        $this->refreshTitle($conversation);
     }
 
     public function addAssistantMessage(AiConversation $conversation, string $content, array $metadata = []): void
     {
         $this->saveMessage($conversation, 'assistant', $content, $metadata);
+        $this->refreshTitle($conversation);
     }
 
     public function addToolMessage(AiConversation $conversation, string $toolName, string $content, string $status = 'success'): void
@@ -160,6 +168,66 @@ class ConversationMemoryService
             'input_data' => $pendingOrder['input_data'],
             'service_id' => $pendingOrder['service_id'],
         ];
+    }
+
+    public function recentConversations(User $user, int $limit = 30): Collection
+    {
+        $conversations = AiConversation::query()
+            ->where('user_id', $user->id)
+            ->where('channel', 'admin_chat')
+            ->with(['messages' => fn ($query) => $query->latest('id')->limit(1)])
+            ->latest('updated_at')
+            ->limit($limit)
+            ->get();
+
+        $conversations->each(function (AiConversation $conversation) {
+            if (!$conversation->title) {
+                $this->refreshTitle($conversation);
+            }
+        });
+
+        return $conversations->fresh(['messages' => fn ($query) => $query->latest('id')->limit(1)]);
+    }
+
+    public function conversationForUser(string $conversationId, User $user): AiConversation
+    {
+        return AiConversation::query()
+            ->where('conversation_id', $conversationId)
+            ->where('user_id', $user->id)
+            ->where('channel', 'admin_chat')
+            ->with(['messages' => fn ($query) => $query->orderBy('id')])
+            ->firstOrFail();
+    }
+
+    public function refreshTitle(AiConversation $conversation): string
+    {
+        $conversation->refresh();
+        $state = ($conversation->metadata ?? [])['procedure_flow'] ?? [];
+        $service = $state['service_name'] ?? null;
+        $subject = $state['subject_name'] ?? null;
+        $orderId = $state['order_id'] ?? null;
+
+        if ($service && $subject) {
+            $title = "{$service} para {$subject}";
+        } elseif ($service) {
+            $title = "Consulta {$service}";
+        } else {
+            $firstMessage = $conversation->messages()
+                ->where('role', 'user')
+                ->oldest('id')
+                ->value('content');
+            $title = $firstMessage
+                ? Str::limit(trim($firstMessage), 40, '…')
+                : 'Nueva conversación';
+        }
+
+        if ($orderId) {
+            $title .= " · Solicitud #{$orderId}";
+        }
+
+        $conversation->update(['title' => Str::limit($title, 160, '')]);
+
+        return $title;
     }
 
     private function saveMessage(AiConversation $conversation, string $role, string $content, array $metadata = []): void

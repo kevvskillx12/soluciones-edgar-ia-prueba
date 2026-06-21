@@ -47,6 +47,47 @@ require __DIR__ . '/auth.php';
 
 Route::view('/ia-chat', 'ia-chat');
 
+Route::middleware('auth')->group(function () {
+    Route::get('/ia-conversations', function () {
+        $memory = app(\App\Services\AI\ConversationMemoryService::class);
+
+        return response()->json([
+            'conversations' => $memory->recentConversations(auth()->user())->map(function ($conversation) {
+                $state = ($conversation->metadata ?? [])['procedure_flow'] ?? [];
+                $lastMessage = $conversation->messages->first();
+
+                return [
+                    'conversation_id' => $conversation->conversation_id,
+                    'title' => $conversation->title ?: 'Nueva conversación',
+                    'updated_at' => $conversation->updated_at?->toIso8601String(),
+                    'last_message' => $lastMessage ? \Illuminate\Support\Str::limit($lastMessage->content, 80) : null,
+                    'status' => $state['status'] ?? null,
+                    'order_id' => $state['order_id'] ?? null,
+                ];
+            })->values(),
+        ]);
+    });
+
+    Route::get('/ia-conversations/{conversationId}', function (string $conversationId) {
+        $memory = app(\App\Services\AI\ConversationMemoryService::class);
+        $conversation = $memory->conversationForUser($conversationId, auth()->user());
+
+        return response()->json([
+            'conversation_id' => $conversation->conversation_id,
+            'title' => $conversation->title ?: 'Nueva conversación',
+            'metadata' => $conversation->metadata,
+            'messages' => $conversation->messages
+                ->whereIn('role', ['user', 'assistant'])
+                ->map(fn ($message) => [
+                    'role' => $message->role,
+                    'content' => $message->content,
+                    'created_at' => $message->created_at?->toIso8601String(),
+                ])
+                ->values(),
+        ]);
+    });
+});
+
 Route::post('/ia-test', function () {
     try {
         set_time_limit(300);
@@ -160,6 +201,7 @@ Route::post('/ia-test', function () {
             : null;
         $procedureFlowToolStatus = $procedureFlowResult['tool_status'] ?? 'SUCCESS';
         $procedureFlowOrderId = $procedureFlowResult['order_id'] ?? null;
+        $memoryService->refreshTitle($conversation);
 
         // ── Helpers de extracción de contexto de pedidos ──────────────────────
         $findServiceByName = function (?string $serviceName) {
@@ -449,6 +491,7 @@ Route::post('/ia-test', function () {
                     $memoryService->addAssistantMessage($conversation, $fullResponse, [
                         'tool' => $success ? 'rag_stream' : ($businessResponse ? $businessSource : 'rag_bridge_error'),
                     ]);
+                    $memoryService->refreshTitle($conversation);
                 } catch (\Throwable $e) {
                     \Illuminate\Support\Facades\Log::error('No se pudo guardar mensaje assistant: ' . $e->getMessage());
                 }

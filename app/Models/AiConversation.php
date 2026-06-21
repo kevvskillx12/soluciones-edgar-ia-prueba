@@ -12,6 +12,7 @@ class AiConversation extends Model
         'conversation_id',
         'user_id',
         'channel',
+        'title',
         'summary',
         'metadata',
     ];

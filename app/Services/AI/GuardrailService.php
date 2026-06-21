@@ -45,6 +45,9 @@ class GuardrailService
             '/^\s*(una?\s+)?(curp|acta|rfc|nss|documentos?|identificacion)\b.{0,25}\b(fals[ao]s?|fraudulent[ao]s?)\b/u',
             '/\b(como|ayudame a|quiero)\b.{0,30}\b(falsificar|falsifico|alterar)\b.{0,30}\b(curp|acta|rfc|nss|documentos?|identificacion)\b/u',
             '/\bdame\b.{0,30}\bdatos personales reales\b.{0,30}\b(otra persona|tercero)\b/u',
+            '/\b(descarga|obten|consulta|dame|consigue)\b.{0,35}\b(curp|rfc|nss|constancia|datos?)\b.{0,40}\b(otra persona|tercero|sin autorizacion)\b/u',
+            '/\bdame\s+(?:el|la)\s+(?:curp|rfc|nss)\s+de\s+[a-z]+(?:\s+[a-z]+)+/u',
+            '/\b(contrasena|password|e firma|efirma|clave privada|acceso ilegal|suplantacion)\b/u',
         ];
 
         foreach ($documentFraudPatterns as $pattern) {

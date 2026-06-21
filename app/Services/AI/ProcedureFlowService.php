@@ -12,6 +12,10 @@ use Illuminate\Support\Str;
 
 class ProcedureFlowService
 {
+    public function __construct(private readonly ProcedureFieldExtractor $fieldExtractor)
+    {
+    }
+
     /**
      * @return array{handled: bool, response: ?string, state: ?array}
      */
@@ -43,7 +47,10 @@ class ProcedureFlowService
                 );
             }
 
-            return $this->handled('Hola. ¿Qué trámite necesitas realizar?', $state);
+            return $this->handled(
+                'Hola. Estoy listo para ayudarte con trámites. ¿Qué trámite necesitas realizar?',
+                $state
+            );
         }
 
         $creationStatusResponse = $this->answerCreationStatusQuestion($normalized, $state);
@@ -56,6 +63,25 @@ class ProcedureFlowService
         }
 
         if (($state['status'] ?? null) === 'ready_to_confirm') {
+            if ($this->isCorrection($normalized)) {
+                $correction = $this->fieldExtractor->extract(
+                    $prompt,
+                    null,
+                    [],
+                    $state,
+                    $state['required_fields'] ?? []
+                );
+                foreach ($correction['fields'] as $fieldName => $value) {
+                    $state['collected_fields'][$fieldName] = $value;
+                }
+                if ($correction['found']) {
+                    $state = $this->refreshProgress($state);
+                    $this->persistState($conversation, $state);
+
+                    return $this->handled($this->readyResponse($state), $state);
+                }
+            }
+
             if ($this->isCancellation($normalized)) {
                 $state['status'] = 'cancelled';
                 $state['current_field'] = null;
@@ -110,8 +136,16 @@ class ProcedureFlowService
             return $this->handled($stateResponse, $state);
         }
 
+        if (($state['status'] ?? null) === 'completed') {
+            return $this->handled($this->completedResponse($state), $state);
+        }
+
         $services = $this->availableServices();
         $service = $this->detectService($prompt, $services);
+        if (!empty($state['service_id'])
+            && in_array($state['status'] ?? null, ['awaiting_subject', 'collecting', 'ready_to_confirm'], true)) {
+            $service = null;
+        }
         $subjectName = $this->extractSubjectName($prompt);
 
         if (!$state && $services->isEmpty() && $this->mentionsKnownService($normalized)) {
@@ -160,17 +194,26 @@ class ProcedureFlowService
             );
         }
 
-        if ($state['current_field'] && !$service && !$subjectName) {
-            $capture = $this->captureCurrentField($state, $prompt);
-            if ($capture['attempted']) {
-                if (!$capture['valid']) {
-                    return $this->handled(
-                        "El valor no tiene el formato esperado para {$capture['label']}. Por favor, vuelve a capturarlo.",
-                        $state
-                    );
-                }
+        if ($state['current_field']) {
+            $current = $this->currentFieldDefinition($state) ?? [];
+            $capture = $this->fieldExtractor->extract(
+                $prompt,
+                $state['current_field'],
+                $current,
+                $state,
+                $state['required_fields'] ?? []
+            );
 
-                $state = $capture['state'];
+            foreach ($capture['fields'] as $fieldName => $value) {
+                $state['collected_fields'][$fieldName] = $value;
+            }
+
+            if (!$capture['found'] && !$service && !$subjectName) {
+                return $this->handled(
+                    "No pude identificar un valor válido para {$current['label']}. "
+                    . 'Por favor, indícalo nuevamente.',
+                    $state
+                );
             }
         }
 
@@ -201,6 +244,8 @@ class ProcedureFlowService
     {
         $isLastProcedure = $this->matches($normalized, [
             'cual era el ultimo tramite',
+            'cual fue el ultimo tramite que hice',
+            'cual fue el ultimo tramite',
             'ultimo tramite que estaba haciendo',
             'que tramite estaba haciendo',
         ]);
@@ -213,8 +258,13 @@ class ProcedureFlowService
             'a nombre de quien',
             'como me llamo y que tramite necesito',
         ]);
+        $isDataSummary = $this->matches($normalized, [
+            'datos del ultimo tramite',
+            'cuales fueron los datos',
+            'que datos capture',
+        ]);
 
-        if (!$isLastProcedure && !$isMissing && !$isCurrent && !$isSubject) {
+        if (!$isLastProcedure && !$isMissing && !$isCurrent && !$isSubject && !$isDataSummary) {
             return null;
         }
 
@@ -224,9 +274,14 @@ class ProcedureFlowService
 
         $subject = $state['subject_name'] ?? null;
         if ($isLastProcedure) {
-            return $subject
+            $response = $subject
                 ? "Estabas realizando el trámite {$state['service_name']} para {$subject}."
                 : "Estabas realizando el trámite {$state['service_name']}.";
+            if (!empty($state['order_id'])) {
+                $response = rtrim($response, '.') . " · Solicitud #{$state['order_id']}.";
+            }
+
+            return $response;
         }
 
         if ($isMissing) {
@@ -241,6 +296,20 @@ class ProcedureFlowService
             return $current
                 ? "Te pedí el dato {$current['label']}."
                 : 'No hay un dato pendiente por capturar.';
+        }
+
+        if ($isDataSummary) {
+            $details = collect($state['required_fields'] ?? [])
+                ->map(function ($field) use ($state) {
+                    $value = $state['collected_fields'][$field['name']] ?? null;
+                    return $value !== null ? "{$field['label']}: {$value}" : null;
+                })
+                ->filter()
+                ->implode(', ');
+
+            return $details !== ''
+                ? "Datos del trámite {$state['service_name']}: {$details}."
+                : "El trámite {$state['service_name']} todavía no tiene datos capturados.";
         }
 
         if (!$subject) {
@@ -386,6 +455,12 @@ class ProcedureFlowService
 
         $preferredCodes = [
             'acta de nacimiento' => 'ACT-NAC',
+            'constancia de situacion fiscal' => 'CSF-02',
+            'constancia fiscal' => 'CSF-02',
+            'descarga de constancia' => 'CSF-02',
+            'consulta de rfc' => 'CSF-02',
+            'consultar rfc' => 'CSF-02',
+            'para rfc' => 'CSF-02',
             'curp' => 'CURP-01',
         ];
 
@@ -414,13 +489,15 @@ class ProcedureFlowService
         $fields = collect($service->form_schema ?? [])
             ->filter(fn ($field) => (bool) ($field['required'] ?? false))
             ->values()
-            ->map(fn ($field) => [
+            ->map(fn ($field, $index) => array_merge($field, [
                 'name' => (string) $field['name'],
                 'label' => (string) ($field['label'] ?? $field['name']),
                 'type' => (string) ($field['type'] ?? 'text'),
                 'required' => true,
-                'regex' => $field['regex'] ?? null,
-            ])
+                'order' => $field['order'] ?? $index,
+            ]))
+            ->sortBy('order')
+            ->values()
             ->all();
 
         $state['service_id'] = $service->id;
@@ -434,41 +511,6 @@ class ProcedureFlowService
         $state['status'] = $fields ? 'collecting' : 'ready_to_confirm';
 
         return $state;
-    }
-
-    private function captureCurrentField(array $state, string $prompt): array
-    {
-        $field = $this->currentFieldDefinition($state);
-        if (!$field) {
-            return ['attempted' => false, 'valid' => false, 'label' => '', 'state' => $state];
-        }
-
-        $value = trim($prompt);
-        if ($field['name'] === 'curp' && preg_match('/\b([A-Z]{4}\d{6}[HM][A-Z]{2}[A-Z]{3}[A-Z0-9]{2})\b/i', $prompt, $match)) {
-            $value = strtoupper($match[1]);
-        } elseif (preg_match('/:\s*(.+)$/u', $prompt, $match)) {
-            $value = trim($match[1]);
-        }
-
-        if ($value === '' || $this->looksLikeProcedureRequest($this->normalize($value))) {
-            return ['attempted' => false, 'valid' => false, 'label' => $field['label'], 'state' => $state];
-        }
-
-        $valid = true;
-        if (!empty($field['regex'])) {
-            $valid = @preg_match($field['regex'], $value) === 1;
-        }
-
-        if ($valid) {
-            $state['collected_fields'][$field['name']] = $value;
-        }
-
-        return [
-            'attempted' => true,
-            'valid' => $valid,
-            'label' => $field['label'],
-            'state' => $state,
-        ];
     }
 
     private function refreshProgress(array $state): array
@@ -592,14 +634,10 @@ class ProcedureFlowService
 
     private function isGenericGreeting(string $normalized): bool
     {
-        return in_array($normalized, [
-            'hola',
-            'buenos dias',
-            'buenas tardes',
-            'buenas noches',
-            'que tal',
-            'ayuda',
-        ], true);
+        return preg_match(
+            '/^(hola(?:\s+como estas)?|buenos dias|buenas tardes|buenas noches|que tal|ayuda)[.!?]*$/u',
+            $normalized
+        ) === 1;
     }
 
     private function isCorruptState(array $state): bool
@@ -743,6 +781,11 @@ class ProcedureFlowService
     {
         return $normalized === 'no'
             || preg_match('/\b(cancelar|cancela|no continuar|mejor no)\b/u', $normalized) === 1;
+    }
+
+    private function isCorrection(string $normalized): bool
+    {
+        return preg_match('/\b(me equivoque|correct[oa]|corrige|cambia)\b/u', $normalized) === 1;
     }
 
     private function handled(
