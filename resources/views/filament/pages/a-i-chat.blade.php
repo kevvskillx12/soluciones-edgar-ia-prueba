@@ -3,6 +3,7 @@
 @push('styles')
 <style>
     #gpt-shell {
+        /* ---- Light mode tokens: alineados a la paleta Filament (gray + primary) ---- */
         --bg-base: #f9fafb;
         --bg-panel: #ffffff;
         --bg-elevated: #f9fafb;
@@ -12,30 +13,36 @@
         --text-primary: #111827;
         --text-secondary: #4b5563;
         --text-muted: #6b7280;
+
+        /* Único acento de marca: el primary configurado en el panel (Indigo) */
         --accent: rgb(var(--primary-600));
         --accent-strong: rgb(var(--primary-500));
-        --accent-soft: rgb(var(--primary-500) / .10);
-        --gold: rgb(var(--primary-600));
-        --status-curso: rgb(var(--warning-600));
-        --status-capturando: rgb(var(--info-600));
-        --status-confirmacion: rgb(var(--primary-500));
-        --status-completado: rgb(var(--success-600));
+        --accent-soft: rgb(var(--primary-500) / .08);
+        --accent-ring: rgb(var(--primary-600) / .18);
+
+        /* Sólo dos semánticos adicionales, usados con mucha mesura */
+        --success: rgb(var(--success-600));
+        --success-soft: rgb(var(--success-500) / .10);
         --danger: rgb(var(--danger-600));
+        --danger-soft: rgb(var(--danger-500) / .10);
+
+        --ring-soft: rgb(var(--gray-950) / .06);
 
         display: flex;
         flex-direction: column;
         width: 100%;
         max-width: none;
-        height: calc(100dvh - 118px);
-        min-height: 600px;
+        height: calc(100vh - 170px);
+        min-height: 560px;
         margin: 0 auto;
         background: var(--bg-base);
         font-family: inherit;
+        font-size: 14px;
         color: var(--text-primary);
         overflow: hidden;
         border: 1px solid var(--border);
         border-radius: 12px;
-        box-shadow: 0 1px 3px rgb(0 0 0 / .08), 0 1px 2px rgb(0 0 0 / .05);
+        box-shadow: 0 1px 3px rgb(0 0 0 / .06), 0 1px 2px rgb(0 0 0 / .04);
     }
     .dark #gpt-shell {
         --bg-base: rgb(var(--gray-950));
@@ -47,10 +54,18 @@
         --text-primary: #f9fafb;
         --text-secondary: #d1d5db;
         --text-muted: #9ca3af;
+
         --accent: rgb(var(--primary-600));
         --accent-strong: rgb(var(--primary-400));
         --accent-soft: rgb(var(--primary-500) / .14);
-        --gold: rgb(var(--primary-400));
+        --accent-ring: rgb(var(--primary-400) / .22);
+
+        --success: rgb(var(--success-400));
+        --success-soft: rgb(var(--success-500) / .14);
+        --danger: rgb(var(--danger-400));
+        --danger-soft: rgb(var(--danger-500) / .14);
+
+        --ring-soft: rgb(255 255 255 / .08);
         box-shadow: 0 1px 2px rgb(0 0 0 / .35);
     }
     #gpt-shell *, #gpt-shell *::before, #gpt-shell *::after {
@@ -69,103 +84,110 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 16px;
-        padding: 18px 26px;
+        gap: 18px;
+        padding: 18px 28px;
         border-bottom: 1px solid var(--border);
         background: var(--bg-panel);
     }
     .gpt-chat-heading {
         display: flex;
         align-items: center;
-        gap: 13px;
+        gap: 14px;
         min-width: 0;
     }
     .gpt-header-avatar {
         display: grid;
         place-items: center;
         flex: 0 0 auto;
-        width: 38px;
-        height: 38px;
-        border-radius: 9px;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
         color: var(--accent-strong);
         background: var(--accent-soft);
-        border: 1px solid rgb(var(--primary-500) / .30);
+        border: 1px solid var(--accent-ring);
         font-size: 17px;
     }
     .gpt-header-copy { min-width: 0; }
     .gpt-header-copy h2 {
         color: var(--text-primary);
-        font-size: 15px;
+        font-size: 15.5px;
         font-weight: 700;
         letter-spacing: -.01em;
+        line-height: 1.3;
     }
     .gpt-header-copy p {
-        margin-top: 2px;
+        margin-top: 3px;
         color: var(--text-muted);
-        font-size: 12px;
-        line-height: 1.4;
+        font-size: 12.5px;
+        line-height: 1.5;
     }
     .gpt-header-actions {
         display: flex;
         align-items: center;
-        gap: 9px;
+        gap: 10px;
         flex: 0 0 auto;
     }
     #gpt-status-text {
         display: inline-flex;
         align-items: center;
-        gap: 7px;
-        min-height: 32px;
-        padding: 6px 12px;
+        gap: 8px;
+        min-height: 36px;
+        padding: 7px 14px;
         border: 1px solid var(--border);
-        border-radius: 7px;
+        border-radius: 8px;
         color: var(--text-secondary);
         background: var(--bg-elevated);
-        font-size: 11px;
-        font-weight: 650;
-        letter-spacing: .03em;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: .02em;
         white-space: nowrap;
     }
+    /* Sólo 3 colores de estado en toda la pieza: gris (neutro), primary (trabajando), success (listo) y danger (error) */
     #gpt-status-text::before {
         content: '';
-        width: 6px;
-        height: 6px;
+        width: 7px;
+        height: 7px;
         border-radius: 999px;
-        background: var(--status-completado);
+        background: var(--success);
+        flex-shrink: 0;
     }
-    #gpt-status-text[data-state="listening"]::before { background: var(--danger); animation: gptPulse 1s infinite; }
     #gpt-status-text[data-state="processing"]::before,
-    #gpt-status-text[data-state="searching"]::before { background: var(--status-curso); }
-    #gpt-status-text[data-state="streaming"]::before { background: var(--status-capturando); animation: gptPulse 1s infinite; }
+    #gpt-status-text[data-state="searching"]::before,
+    #gpt-status-text[data-state="streaming"]::before { background: var(--accent-strong); }
+    #gpt-status-text[data-state="streaming"]::before,
+    #gpt-status-text[data-state="listening"]::before { animation: gptPulse 1s infinite; }
+    #gpt-status-text[data-state="listening"]::before,
     #gpt-status-text[data-state="error"]::before { background: var(--danger); }
     @keyframes gptPulse { 50% { opacity: .35; transform: scale(.7); } }
 
     .gpt-icon-btn {
         display: inline-grid;
         place-items: center;
-        width: 36px;
-        height: 32px;
+        width: 38px;
+        height: 36px;
         border: 1px solid var(--border);
-        border-radius: 7px;
+        border-radius: 8px;
         color: var(--text-secondary);
         background: var(--bg-elevated);
         cursor: pointer;
+        transition: border-color .15s, color .15s, background .15s;
     }
-    .gpt-icon-btn:hover { border-color: var(--accent-strong); color: var(--text-primary); }
+    .gpt-icon-btn:hover { border-color: var(--accent-strong); color: var(--accent-strong); background: var(--accent-soft); }
 
     #gpt-new-chat {
         display: inline-flex;
         align-items: center;
-        gap: 7px;
-        min-height: 32px;
-        padding: 7px 13px;
-        border: 1px solid var(--accent-strong);
-        border-radius: 7px;
+        gap: 8px;
+        min-height: 36px;
+        padding: 9px 17px;
+        border: 1px solid transparent;
+        border-radius: 8px;
         color: #ffffff;
         background: var(--accent);
-        font-size: 12px;
-        font-weight: 650;
+        font-size: 13px;
+        font-weight: 600;
         cursor: pointer;
+        box-shadow: 0 1px 2px rgb(0 0 0 / .06);
         transition: background .15s, transform .15s;
     }
     #gpt-new-chat:hover { background: var(--accent-strong); }
@@ -183,33 +205,33 @@
 
     /* ---------- Left: history ---------- */
     #gpt-history {
-        width: 292px;
-        flex: 0 0 292px;
-        padding: 20px 16px;
+        width: 296px;
+        flex: 0 0 296px;
+        padding: 22px 12px 22px 22px;
         overflow-y: auto;
+        scrollbar-gutter: stable;
         border-right: 1px solid var(--border);
         background: var(--bg-panel);
     }
     .gpt-history-title {
-        padding: 2px 4px 14px;
+        padding: 2px 6px 16px;
         color: var(--text-muted);
-        font-size: 10.5px;
-        font-weight: 750;
-        letter-spacing: .08em;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .05em;
         text-transform: uppercase;
     }
     .gpt-history-empty {
-        padding: 10px 8px;
+        padding: 12px 10px;
         color: var(--text-muted);
-        font-size: 12px;
-        line-height: 1.5;
+        font-size: 12.5px;
+        line-height: 1.6;
     }
     .gpt-history-item {
         display: block;
         width: 100%;
-        min-height: 76px;
-        margin-bottom: 11px;
-        padding: 13px 14px;
+        margin-bottom: 12px;
+        padding: 14px 15px;
         border: 1px solid var(--border);
         border-left: 3px solid transparent;
         border-radius: 10px;
@@ -217,13 +239,13 @@
         background: var(--bg-elevated);
         text-align: left;
         cursor: pointer;
-        box-shadow: 0 1px 2px rgb(0 0 0 / .04);
+        box-shadow: 0 1px 2px var(--ring-soft);
         transition: background .15s, border-color .15s, box-shadow .15s, transform .15s;
     }
     .gpt-history-item:hover {
-        border-color: rgb(var(--primary-500) / .35);
+        border-color: var(--accent-ring);
         background: var(--bg-elevated-2);
-        box-shadow: 0 4px 12px rgb(0 0 0 / .07);
+        box-shadow: 0 4px 10px var(--ring-soft);
         transform: translateY(-1px);
     }
     .gpt-history-item.is-active {
@@ -234,15 +256,15 @@
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
-        gap: 8px;
+        gap: 10px;
     }
     .gpt-history-item strong {
         display: -webkit-box;
         overflow: hidden;
         color: var(--text-primary);
-        font-size: 13px;
+        font-size: 13.5px;
         font-weight: 650;
-        line-height: 1.4;
+        line-height: 1.45;
         -webkit-box-orient: vertical;
         -webkit-line-clamp: 2;
         white-space: normal;
@@ -251,47 +273,48 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 6px;
-        margin-top: 9px;
+        gap: 8px;
+        margin-top: 10px;
     }
     .gpt-history-item span.gpt-h-date {
         overflow: hidden;
         color: var(--text-muted);
-        font-size: 10.5px;
+        font-size: 11px;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
     .gpt-h-folio {
         flex: 0 0 auto;
-        padding: 1px 6px;
+        padding: 2px 7px;
         border-radius: 4px;
         border: 1px solid var(--border);
-        color: var(--gold);
-        font-size: 9.5px;
+        color: var(--accent-strong);
+        font-size: 10px;
         letter-spacing: .02em;
     }
+    /* Estados reducidos a 3 colores: gris (en curso), primary (capturando / esperando confirmación) y success (completado) */
     .gpt-status-tag {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        margin-top: 8px;
-        padding: 3px 8px;
+        gap: 5px;
+        margin-top: 9px;
+        padding: 4px 9px;
         border-radius: 999px;
-        font-size: 10px;
+        font-size: 10.5px;
         font-weight: 700;
-        letter-spacing: .03em;
+        letter-spacing: .02em;
         text-transform: uppercase;
         width: fit-content;
+        background: var(--bg-elevated-2);
+        color: var(--text-secondary);
     }
-    .gpt-status-tag::before { content:''; width:5px; height:5px; border-radius:999px; }
-    .gpt-status-tag[data-status="curso"] { color: var(--status-curso); background: rgb(var(--warning-500) / .12); }
-    .gpt-status-tag[data-status="curso"]::before { background: var(--status-curso); }
-    .gpt-status-tag[data-status="capturando"] { color: var(--status-capturando); background: rgb(var(--info-500) / .12); }
-    .gpt-status-tag[data-status="capturando"]::before { background: var(--status-capturando); }
-    .gpt-status-tag[data-status="confirmacion"] { color: var(--status-confirmacion); background: rgb(var(--primary-500) / .12); }
-    .gpt-status-tag[data-status="confirmacion"]::before { background: var(--status-confirmacion); }
-    .gpt-status-tag[data-status="completado"] { color: var(--status-completado); background: rgb(var(--success-500) / .12); }
-    .gpt-status-tag[data-status="completado"]::before { background: var(--status-completado); }
+    .gpt-status-tag::before { content:''; width:5px; height:5px; border-radius:999px; background: var(--text-muted); flex-shrink: 0; }
+    .gpt-status-tag[data-status="capturando"],
+    .gpt-status-tag[data-status="confirmacion"] { background: var(--accent-soft); color: var(--accent-strong); }
+    .gpt-status-tag[data-status="capturando"]::before,
+    .gpt-status-tag[data-status="confirmacion"]::before { background: var(--accent-strong); }
+    .gpt-status-tag[data-status="completado"] { background: var(--success-soft); color: var(--success); }
+    .gpt-status-tag[data-status="completado"]::before { background: var(--success); }
 
     /* ---------- Center column ---------- */
     .gpt-chat-main {
@@ -306,22 +329,22 @@
         align-items: center;
         justify-content: space-between;
         gap: 10px;
-        padding: 14px 28px;
+        padding: 16px 30px;
         border-bottom: 1px solid var(--border);
-        background: linear-gradient(180deg, var(--bg-panel), var(--bg-base));
+        background: var(--bg-panel);
     }
     .gpt-context-label {
         display: block;
         color: var(--text-muted);
-        font-size: 10px;
+        font-size: 10.5px;
         font-weight: 700;
-        letter-spacing: .08em;
+        letter-spacing: .05em;
         text-transform: uppercase;
     }
     #gpt-context-title {
-        margin-top: 2px;
+        margin-top: 3px;
         color: var(--text-primary);
-        font-size: 14px;
+        font-size: 15px;
         font-weight: 650;
         letter-spacing: -.01em;
     }
@@ -337,7 +360,7 @@
         overflow-y: auto;
         min-height: 0;
         min-width: 0;
-        padding: 30px 36px;
+        padding: 32px 38px;
         scroll-behavior: smooth;
     }
     #gpt-messages::-webkit-scrollbar { width: 6px; }
@@ -353,87 +376,88 @@
         min-height: 100%;
         margin: 0 auto;
         padding: 48px 28px;
-        gap: 16px;
+        gap: 18px;
         text-align: center;
     }
     .gpt-empty-avatar {
         display: grid;
         place-items: center;
-        width: 54px;
-        height: 54px;
-        border-radius: 12px;
+        width: 56px;
+        height: 56px;
+        border-radius: 13px;
         margin-bottom: 2px;
         font-size: 21px;
         color: var(--accent-strong);
         background: var(--accent-soft);
-        border: 1px solid rgb(var(--primary-500) / .30);
+        border: 1px solid var(--accent-ring);
     }
     #gpt-empty h1 {
-        font-size: clamp(20px, 2.6vw, 25px);
+        font-size: clamp(20px, 2.6vw, 26px);
         font-weight: 680;
         color: var(--text-primary);
         letter-spacing: -0.01em;
+        line-height: 1.3;
     }
     #gpt-empty p {
         max-width: 620px;
         color: var(--text-muted);
-        font-size: 13.5px;
-        line-height: 1.6;
+        font-size: 14px;
+        line-height: 1.65;
     }
     .gpt-chips {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: 9px;
         justify-content: center;
         max-width: 760px;
-        margin-top: 14px;
+        margin-top: 16px;
     }
     .gpt-chip {
-        padding: 10px 16px;
+        padding: 11px 17px;
         border-radius: 9px;
         border: 1px solid var(--border);
         background: var(--bg-elevated);
         color: var(--text-secondary);
-        font-size: 12.5px;
-        font-weight: 550;
+        font-size: 13px;
+        font-weight: 600;
         cursor: pointer;
         transition: border-color .15s, color .15s, background .15s;
         line-height: 1.4;
     }
     .gpt-chip:hover {
-        border-color: var(--accent-strong);
-        color: var(--text-primary);
+        border-color: var(--accent-ring);
+        color: var(--accent-strong);
         background: var(--accent-soft);
     }
 
-    /* message rows: ticket-style, not chat bubbles */
+    /* message rows: estilo de nota/ficha, no burbujas de chat */
     .gpt-row {
         width: 100%;
-        padding: 10px 0;
+        padding: 12px 0;
     }
     .gpt-row-inner {
         width: min(100%, 1080px);
         max-width: 1080px;
         margin: 0 auto;
         display: flex;
-        gap: 14px;
+        gap: 15px;
         align-items: flex-start;
     }
     .gpt-row.user .gpt-row-inner { flex-direction: row-reverse; }
     .gpt-avatar {
-        width: 36px;
-        height: 36px;
+        width: 37px;
+        height: 37px;
         border-radius: 10px;
         flex-shrink: 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 10.5px;
+        font-size: 11px;
         font-weight: 700;
         border: 1px solid var(--border);
     }
     .gpt-avatar.user { background: var(--bg-elevated-2); color: var(--text-secondary); }
-    .gpt-avatar.ai { background: var(--accent-soft); color: var(--accent-strong); border-color: rgb(var(--primary-500) / .30); }
+    .gpt-avatar.ai { background: var(--accent-soft); color: var(--accent-strong); border-color: var(--accent-ring); }
     .gpt-message-stack {
         display: flex;
         flex-direction: column;
@@ -443,21 +467,21 @@
     .gpt-row.user .gpt-message-stack { align-items: flex-end; }
     .gpt-sender {
         padding: 0 3px;
-        margin-bottom: 6px;
-        font-size: 11px;
+        margin-bottom: 7px;
+        font-size: 11.5px;
         font-weight: 650;
         letter-spacing: .02em;
         color: var(--text-muted);
         text-transform: uppercase;
     }
     .gpt-msg {
-        padding: 14px 17px;
+        padding: 15px 18px;
         border: 1px solid var(--border);
-        border-left: 3px solid var(--text-secondary);
+        border-left: 3px solid var(--text-muted);
         border-radius: 10px;
         background: var(--bg-elevated);
-        font-size: 14px;
-        line-height: 1.68;
+        font-size: 14.5px;
+        line-height: 1.7;
         color: var(--text-primary);
         white-space: pre-wrap;
         word-break: break-word;
@@ -465,11 +489,11 @@
     .gpt-row.ai .gpt-msg { border-left-color: var(--accent-strong); }
     .gpt-row.user .gpt-msg {
         border-left: none;
-        border-right: 3px solid var(--text-secondary);
+        border-right: 3px solid var(--text-muted);
         background: var(--bg-elevated-2);
         color: var(--text-primary);
     }
-    .typing-dots { display: flex; gap: 5px; padding-top: 2px; }
+    .typing-dots { display: flex; gap: 5px; padding-top: 3px; }
     .typing-dots span {
         width: 6px; height: 6px;
         border-radius: 50%;
@@ -483,52 +507,53 @@
         30%            { opacity: 1;   transform: scale(1.15); }
     }
 
-    /* solicitud confirmada card (rendered inside the chat flow) */
+    /* solicitud confirmada: un único acento (primary), sin colores adicionales */
     .gpt-confirm-card {
-        margin-top: 8px;
-        padding: 14px 15px;
-        border: 1px solid rgb(var(--primary-500) / .35);
-        border-radius: 7px;
-        background: linear-gradient(180deg, rgb(var(--primary-500) / .10), rgb(var(--primary-500) / .03));
+        margin-top: 10px;
+        padding: 16px 17px;
+        border: 1px solid var(--accent-ring);
+        border-radius: 10px;
+        background: var(--accent-soft);
     }
     .gpt-confirm-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 10px;
-        margin-bottom: 9px;
+        margin-bottom: 11px;
     }
     .gpt-confirm-head strong {
-        font-size: 12.5px;
+        font-size: 13px;
         font-weight: 700;
         color: var(--accent-strong);
         letter-spacing: .01em;
     }
     .gpt-confirm-pill {
-        padding: 2px 8px;
-        border-radius: 4px;
-        background: rgb(var(--warning-500) / .13);
-        color: var(--status-curso);
-        font-size: 10px;
+        padding: 3px 9px;
+        border-radius: 5px;
+        background: var(--bg-panel);
+        color: var(--text-secondary);
+        font-size: 10.5px;
         font-weight: 700;
-        letter-spacing: .04em;
+        letter-spacing: .03em;
         text-transform: uppercase;
+        border: 1px solid var(--border);
     }
     .gpt-confirm-grid {
         display: grid;
         grid-template-columns: auto 1fr;
-        gap: 5px 10px;
-        font-size: 12.5px;
+        gap: 7px 12px;
+        font-size: 13px;
     }
     .gpt-confirm-grid dt { color: var(--text-muted); }
     .gpt-confirm-grid dd { color: var(--text-primary); font-weight: 550; }
-    .gpt-confirm-folio { font-weight: 700; color: var(--gold); }
+    .gpt-confirm-folio { font-weight: 700; color: var(--accent-strong); }
 
     /* ---------- Right: resumen del trámite ---------- */
     #gpt-summary {
         width: 320px;
         flex: 0 0 320px;
-        padding: 24px 22px;
+        padding: 26px 24px;
         overflow-y: auto;
         border-left: 1px solid var(--border);
         background: var(--bg-panel);
@@ -536,77 +561,96 @@
     .gpt-summary-heading {
         font-size: 11px;
         font-weight: 750;
-        letter-spacing: .07em;
+        letter-spacing: .05em;
         text-transform: uppercase;
         color: var(--text-muted);
-        margin-bottom: 10px;
+        margin-bottom: 14px;
+        flex: 0 0 auto;
+    }
+    #gpt-summary-empty {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    .gpt-summary-empty-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 22px;
+        padding-bottom: 10px;
     }
     #gpt-summary-empty p {
         color: var(--text-secondary);
-        font-size: 12.5px;
-        line-height: 1.6;
-        margin-bottom: 16px;
+        font-size: 13px;
+        line-height: 1.65;
+        text-align: center;
     }
     .gpt-summary-suggest-title {
         font-size: 10.5px;
         font-weight: 700;
-        letter-spacing: .05em;
+        letter-spacing: .04em;
         text-transform: uppercase;
         color: var(--text-muted);
-        margin-bottom: 8px;
+        margin-bottom: 10px;
+        text-align: center;
     }
     .gpt-summary-suggest-list {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 9px;
     }
     .gpt-summary-suggest-list span {
-        display: block;
-        padding: 8px 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 12px 8px;
         border: 1px solid var(--border);
-        border-radius: 6px;
+        border-radius: 9px;
         background: var(--bg-elevated);
         color: var(--text-secondary);
-        font-size: 12px;
+        font-size: 12.5px;
+        font-weight: 600;
     }
     .gpt-summary-grid {
         display: grid;
-        gap: 16px;
+        gap: 18px;
     }
     .gpt-summary-grid > div {
-        padding-bottom: 14px;
+        padding-bottom: 16px;
         border-bottom: 1px solid var(--border-soft);
     }
     .gpt-summary-grid dt {
-        font-size: 10px;
+        font-size: 10.5px;
         font-weight: 700;
-        letter-spacing: .05em;
+        letter-spacing: .04em;
         text-transform: uppercase;
         color: var(--text-muted);
-        margin-bottom: 3px;
+        margin-bottom: 4px;
     }
     .gpt-summary-grid dd {
-        font-size: 13px;
+        font-size: 13.5px;
         color: var(--text-primary);
         font-weight: 550;
         word-break: break-word;
     }
-    #gpt-sum-folio.gpt-mono { color: var(--gold); }
+    #gpt-sum-folio.gpt-mono { color: var(--accent-strong); }
     .gpt-summary-fields {
-        margin-top: 12px;
+        margin-top: 14px;
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 8px;
     }
     .gpt-summary-field-row {
         display: flex;
         justify-content: space-between;
-        gap: 8px;
-        padding: 10px 11px;
+        gap: 10px;
+        padding: 11px 12px;
         border: 1px solid var(--border-soft);
-        border-radius: 5px;
+        border-radius: 7px;
         background: var(--bg-elevated);
-        font-size: 11.5px;
+        font-size: 12px;
     }
     .gpt-summary-field-row span:first-child { color: var(--text-muted); }
     .gpt-summary-field-row span:last-child { color: var(--text-primary); font-weight: 550; }
@@ -616,7 +660,7 @@
         position: sticky;
         bottom: 0;
         flex: 0 0 auto;
-        padding: 16px 32px 20px;
+        padding: 18px 34px 22px;
         border-top: 1px solid var(--border);
         background: var(--bg-panel);
     }
@@ -628,57 +672,62 @@
         border-radius: 12px;
         display: flex;
         align-items: center;
-        padding: 10px;
-        gap: 10px;
-        transition: border-color .2s;
+        padding: 11px;
+        gap: 11px;
+        transition: border-color .15s, box-shadow .15s;
     }
-    .gpt-input-wrap:focus-within { border-color: var(--accent-strong); }
+    .gpt-input-wrap:focus-within {
+        border-color: var(--accent-strong);
+        box-shadow: 0 0 0 3px var(--accent-ring);
+    }
     #gpt-prompt {
         flex: 1;
         min-width: 0;
-        padding: 5px 4px;
+        padding: 6px 5px;
         background: transparent;
         border: none;
         outline: none;
         color: var(--text-primary);
-        font-size: 13.5px;
-        line-height: 1.5;
+        font-size: 14px;
+        line-height: 1.55;
         resize: none;
-        min-height: 22px;
+        min-height: 24px;
         max-height: 170px;
         overflow-y: auto;
         font-family: inherit;
     }
     #gpt-prompt::placeholder { color: var(--text-muted); }
     #gpt-mic {
-        width: 36px;
-        height: 36px;
+        width: 38px;
+        height: 38px;
         padding: 0;
         border: 1px solid var(--border);
-        border-radius: 7px;
+        border-radius: 8px;
         background: var(--bg-elevated-2);
         color: var(--text-secondary);
         cursor: pointer;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        flex: 0 0 36px;
+        flex: 0 0 38px;
         visibility: visible;
         opacity: 1;
         transition: color 0.15s, background 0.15s, border-color 0.15s;
     }
-    #gpt-mic:hover:not(:disabled) { border-color: var(--accent-strong); color: var(--text-primary); }
-    #gpt-mic svg { display: block; width: 18px; height: 18px; pointer-events: none; }
+    #gpt-mic:hover:not(:disabled) { border-color: var(--accent-strong); color: var(--accent-strong); }
+    #gpt-mic svg { display: block; width: 19px; height: 19px; pointer-events: none; }
+    /* Grabando: único caso que usa danger, por ser una señal estándar de "grabación activa" */
     #gpt-mic.is-listening {
         color: #fff;
         background: var(--danger);
         border-color: var(--danger);
         animation: gpt-mic-pulse 1s ease-in-out infinite;
     }
+    /* Procesando voz: mismo acento primary que el resto de estados "en proceso" */
     #gpt-mic.is-processing {
-        color: #111827;
-        background: var(--status-curso);
-        border-color: var(--status-curso);
+        color: var(--accent-strong);
+        background: var(--accent-soft);
+        border-color: var(--accent-ring);
     }
     #gpt-mic.is-unavailable,
     #gpt-mic:disabled {
@@ -688,40 +737,40 @@
         cursor: not-allowed;
         opacity: 0.7;
     }
-    @keyframes gpt-mic-pulse { 50% { box-shadow: 0 0 0 5px rgb(var(--danger-500) / .20); } }
+    @keyframes gpt-mic-pulse { 50% { box-shadow: 0 0 0 5px var(--danger-soft); } }
     #gpt-send {
-        width: 36px; height: 36px;
-        border-radius: 7px;
+        width: 38px; height: 38px;
+        border-radius: 8px;
         background: var(--accent);
-        border: 1px solid var(--accent-strong);
+        border: 1px solid transparent;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
+        box-shadow: 0 1px 2px rgb(0 0 0 / .06);
         transition: background 0.15s, opacity 0.15s;
     }
     #gpt-send:hover:not(:disabled) { background: var(--accent-strong); }
     #gpt-send:disabled { opacity: 0.35; cursor: not-allowed; }
-    #gpt-send svg { width: 16px; height: 16px; }
+    #gpt-send svg { width: 17px; height: 17px; }
     #gpt-error {
         display: none;
         max-width: 1080px;
-        margin: 0 auto 8px;
-        padding: 7px 11px;
-        background: rgb(var(--danger-500) / .10);
-        border: 1px solid rgb(var(--danger-500) / .35);
-        border-radius: 6px;
-        font-size: 12px;
-        color: rgb(var(--danger-600));
+        margin: 0 auto 10px;
+        padding: 8px 12px;
+        background: var(--danger-soft);
+        border: 1px solid var(--danger);
+        border-radius: 7px;
+        font-size: 12.5px;
+        color: var(--danger);
     }
-    .dark #gpt-error { color: rgb(var(--danger-300)); }
     .gpt-footer-note {
         text-align: center;
-        font-size: 10.5px;
+        font-size: 11px;
         color: var(--text-muted);
         max-width: 1080px;
-        margin: 7px auto 0;
+        margin: 9px auto 0;
     }
 
     /* ---------- Responsive ---------- */
@@ -732,9 +781,9 @@
             top: 0;
             bottom: 0;
             right: 0;
-            width: min(86vw, 300px);
+            width: min(86vw, 320px);
             transform: translateX(105%);
-            box-shadow: -18px 0 40px rgba(0,0,0,.4);
+            box-shadow: -18px 0 40px rgb(0 0 0 / .18);
             transition: transform .2s ease;
         }
         #gpt-summary.is-open { transform: translateX(0); }
@@ -742,16 +791,15 @@
     }
     @media (max-width: 768px) {
         #gpt-shell {
-            height: calc(100dvh - 118px);
             min-height: 520px;
             border-radius: 12px;
         }
-        .gpt-chat-header { padding: 12px 14px; }
+        .gpt-chat-header { padding: 14px 16px; }
         .gpt-header-copy p { display: none; }
-        .gpt-header-actions { gap: 6px; }
-        #gpt-status-text { padding: 5px 8px; min-height: 32px; font-size: 0; width: 30px; justify-content: center; }
+        .gpt-header-actions { gap: 7px; }
+        #gpt-status-text { padding: 6px 9px; min-height: 36px; font-size: 0; width: 32px; justify-content: center; }
         #gpt-status-text::before { width: 7px; height: 7px; }
-        #gpt-new-chat { padding: 7px; justify-content: center; }
+        #gpt-new-chat { padding: 8px; justify-content: center; }
         #gpt-new-chat span { display: none; }
         #gpt-history-toggle { display: inline-grid; }
         #gpt-history {
@@ -760,25 +808,26 @@
             top: 0;
             bottom: 0;
             left: 0;
-            width: min(82vw, 280px);
+            width: min(82vw, 290px);
             transform: translateX(-105%);
-            box-shadow: 18px 0 40px rgba(0,0,0,.4);
+            box-shadow: 18px 0 40px rgb(0 0 0 / .18);
             transition: transform .2s ease;
         }
         #gpt-history.is-open { transform: translateX(0); }
-        .gpt-context-bar { padding: 10px 14px; }
-        #gpt-messages { padding: 16px 12px; }
-        .gpt-message-stack { max-width: calc(100% - 44px); }
-        .gpt-msg { font-size: 13px; padding: 10px 12px; }
-        #gpt-input-bar { padding: 10px 11px 12px; }
+        .gpt-context-bar { padding: 12px 16px; }
+        #gpt-messages { padding: 18px 14px; }
+        .gpt-message-stack { max-width: calc(100% - 46px); }
+        .gpt-msg { font-size: 13.5px; padding: 11px 13px; }
+        #gpt-input-bar { padding: 12px 13px 14px; }
         .gpt-footer-note { display: none; }
-        .gpt-confirm-grid { grid-template-columns: 1fr; gap: 3px 0; }
+        .gpt-confirm-grid { grid-template-columns: 1fr; gap: 4px 0; }
+        .gpt-summary-suggest-list { grid-template-columns: 1fr 1fr; }
     }
     @media (max-width: 480px) {
         #gpt-shell { min-height: 500px; border-radius: 10px; }
-        .gpt-avatar { width: 27px; height: 27px; }
-        .gpt-message-stack { max-width: calc(100% - 38px); }
-        #gpt-mic, #gpt-send { width: 34px; height: 34px; flex-basis: 34px; }
+        .gpt-avatar { width: 28px; height: 28px; }
+        .gpt-message-stack { max-width: calc(100% - 40px); }
+        #gpt-mic, #gpt-send { width: 36px; height: 36px; flex-basis: 36px; }
     }
 </style>
 @endpush
@@ -861,14 +910,18 @@
                 <aside id="gpt-summary" aria-label="Resumen del trámite activo">
                     <div id="gpt-summary-empty">
                         <div class="gpt-summary-heading">Resumen del trámite</div>
-                        <p>Sin trámite seleccionado.</p>
-                        <div class="gpt-summary-suggest-title">Trámites disponibles</div>
-                        <div class="gpt-summary-suggest-list">
-                            <span>CURP</span>
-                            <span>Acta de nacimiento</span>
-                            <span>RFC</span>
-                            <span>NSS</span>
-                            <span>Constancia fiscal</span>
+                        <div class="gpt-summary-empty-body">
+                            <p>Sin trámite seleccionado.</p>
+                            <div>
+                                <div class="gpt-summary-suggest-title">Trámites disponibles</div>
+                                <div class="gpt-summary-suggest-list">
+                                    <span>CURP</span>
+                                    <span>Acta de nacimiento</span>
+                                    <span>RFC</span>
+                                    <span>NSS</span>
+                                    <span>Constancia fiscal</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div id="gpt-summary-content" hidden>
@@ -910,6 +963,7 @@
     @push('scripts')
     <script>
     (function () {
+        const shellEl    = document.getElementById('gpt-shell');
         const messagesEl = document.getElementById('gpt-messages');
         const promptEl   = document.getElementById('gpt-prompt');
         const sendBtn    = document.getElementById('gpt-send');
@@ -937,6 +991,19 @@
         let loading = false;
         let conversationId = localStorage.getItem('ai_conversation_id') || null;
         let forceNewConversation = false;
+
+        // --- Alto dinámico del panel: evita que la barra de entrada quede cortada
+        // cuando el encabezado/migas de Filament ocupan más o menos espacio del previsto. ---
+        function syncShellHeight() {
+            if (!shellEl) return;
+            const top = shellEl.getBoundingClientRect().top;
+            const available = window.innerHeight - top - 24;
+            shellEl.style.height = Math.max(560, available) + 'px';
+        }
+        window.addEventListener('resize', syncShellHeight);
+        syncShellHeight();
+        setTimeout(syncShellHeight, 250);
+        document.addEventListener('livewire:navigated', syncShellHeight);
 
         promptEl.addEventListener('input', function () {
             this.style.height = 'auto';
