@@ -3,39 +3,55 @@
 @push('styles')
 <style>
     #gpt-shell {
-        --bg-base: #0a0d12;
-        --bg-panel: #0f131a;
-        --bg-elevated: #151a22;
-        --bg-elevated-2: #1a212b;
-        --border: #232b36;
-        --border-soft: rgba(255,255,255,.06);
-        --text-primary: #edf1f5;
-        --text-secondary: #a6b0bf;
-        --text-muted: #677182;
-        --accent: #1f7a6c;
-        --accent-strong: #2a9683;
-        --accent-soft: rgba(31,122,108,.16);
-        --gold: #c7a165;
-        --status-curso: #c98a3d;
-        --status-capturando: #4f86ad;
-        --status-confirmacion: #8d76b8;
-        --status-completado: #2f9e7d;
-        --danger: #c1554c;
+        --bg-base: #f9fafb;
+        --bg-panel: #ffffff;
+        --bg-elevated: #f9fafb;
+        --bg-elevated-2: #f3f4f6;
+        --border: #e5e7eb;
+        --border-soft: #f3f4f6;
+        --text-primary: #111827;
+        --text-secondary: #4b5563;
+        --text-muted: #6b7280;
+        --accent: rgb(var(--primary-600));
+        --accent-strong: rgb(var(--primary-500));
+        --accent-soft: rgb(var(--primary-500) / .10);
+        --gold: rgb(var(--primary-600));
+        --status-curso: rgb(var(--warning-600));
+        --status-capturando: rgb(var(--info-600));
+        --status-confirmacion: rgb(var(--primary-500));
+        --status-completado: rgb(var(--success-600));
+        --danger: rgb(var(--danger-600));
 
         display: flex;
         flex-direction: column;
         width: 100%;
-        max-width: 1280px;
-        height: clamp(620px, calc(100vh - 150px), 880px);
-        min-height: 620px;
+        max-width: none;
+        height: calc(100dvh - 118px);
+        min-height: 600px;
         margin: 0 auto;
         background: var(--bg-base);
-        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-family: inherit;
         color: var(--text-primary);
         overflow: hidden;
         border: 1px solid var(--border);
-        border-radius: 14px;
-        box-shadow: 0 24px 60px rgba(0,0,0,.4);
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgb(0 0 0 / .08), 0 1px 2px rgb(0 0 0 / .05);
+    }
+    .dark #gpt-shell {
+        --bg-base: rgb(var(--gray-950));
+        --bg-panel: rgb(var(--gray-900));
+        --bg-elevated: rgb(var(--gray-900));
+        --bg-elevated-2: rgb(var(--gray-800));
+        --border: rgb(var(--gray-700));
+        --border-soft: rgb(var(--gray-800));
+        --text-primary: #f9fafb;
+        --text-secondary: #d1d5db;
+        --text-muted: #9ca3af;
+        --accent: rgb(var(--primary-600));
+        --accent-strong: rgb(var(--primary-400));
+        --accent-soft: rgb(var(--primary-500) / .14);
+        --gold: rgb(var(--primary-400));
+        box-shadow: 0 1px 2px rgb(0 0 0 / .35);
     }
     #gpt-shell *, #gpt-shell *::before, #gpt-shell *::after {
         box-sizing: border-box;
@@ -54,7 +70,7 @@
         align-items: center;
         justify-content: space-between;
         gap: 16px;
-        padding: 16px 22px;
+        padding: 18px 26px;
         border-bottom: 1px solid var(--border);
         background: var(--bg-panel);
     }
@@ -73,7 +89,7 @@
         border-radius: 9px;
         color: var(--accent-strong);
         background: var(--accent-soft);
-        border: 1px solid rgba(42,150,131,.35);
+        border: 1px solid rgb(var(--primary-500) / .30);
         font-size: 17px;
     }
     .gpt-header-copy { min-width: 0; }
@@ -145,7 +161,7 @@
         padding: 7px 13px;
         border: 1px solid var(--accent-strong);
         border-radius: 7px;
-        color: #eafff8;
+        color: #ffffff;
         background: var(--accent);
         font-size: 12px;
         font-weight: 650;
@@ -167,15 +183,15 @@
 
     /* ---------- Left: history ---------- */
     #gpt-history {
-        width: 252px;
-        flex: 0 0 252px;
-        padding: 14px 10px;
+        width: 292px;
+        flex: 0 0 292px;
+        padding: 20px 16px;
         overflow-y: auto;
         border-right: 1px solid var(--border);
         background: var(--bg-panel);
     }
     .gpt-history-title {
-        padding: 4px 8px 10px;
+        padding: 2px 4px 14px;
         color: var(--text-muted);
         font-size: 10.5px;
         font-weight: 750;
@@ -191,48 +207,57 @@
     .gpt-history-item {
         display: block;
         width: 100%;
-        margin-bottom: 6px;
-        padding: 10px 11px;
-        border: 1px solid var(--border-soft);
-        border-left: 2px solid transparent;
-        border-radius: 6px;
+        min-height: 76px;
+        margin-bottom: 11px;
+        padding: 13px 14px;
+        border: 1px solid var(--border);
+        border-left: 3px solid transparent;
+        border-radius: 10px;
         color: var(--text-secondary);
         background: var(--bg-elevated);
         text-align: left;
         cursor: pointer;
-        transition: background .15s, border-color .15s;
+        box-shadow: 0 1px 2px rgb(0 0 0 / .04);
+        transition: background .15s, border-color .15s, box-shadow .15s, transform .15s;
     }
-    .gpt-history-item:hover { border-color: var(--border); background: var(--bg-elevated-2); }
+    .gpt-history-item:hover {
+        border-color: rgb(var(--primary-500) / .35);
+        background: var(--bg-elevated-2);
+        box-shadow: 0 4px 12px rgb(0 0 0 / .07);
+        transform: translateY(-1px);
+    }
     .gpt-history-item.is-active {
         border-left-color: var(--accent-strong);
         background: var(--accent-soft);
     }
     .gpt-history-item-top {
         display: flex;
-        align-items: baseline;
+        align-items: flex-start;
         justify-content: space-between;
         gap: 8px;
     }
     .gpt-history-item strong {
-        display: block;
+        display: -webkit-box;
         overflow: hidden;
         color: var(--text-primary);
-        font-size: 12px;
+        font-size: 13px;
         font-weight: 650;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        line-height: 1.4;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        white-space: normal;
     }
     .gpt-history-item-meta {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 6px;
-        margin-top: 5px;
+        margin-top: 9px;
     }
     .gpt-history-item span.gpt-h-date {
         overflow: hidden;
         color: var(--text-muted);
-        font-size: 10px;
+        font-size: 10.5px;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
@@ -249,23 +274,23 @@
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        margin-top: 6px;
-        padding: 2px 7px;
-        border-radius: 4px;
-        font-size: 9.5px;
+        margin-top: 8px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 10px;
         font-weight: 700;
         letter-spacing: .03em;
         text-transform: uppercase;
         width: fit-content;
     }
     .gpt-status-tag::before { content:''; width:5px; height:5px; border-radius:999px; }
-    .gpt-status-tag[data-status="curso"] { color: var(--status-curso); background: rgba(201,138,61,.14); }
+    .gpt-status-tag[data-status="curso"] { color: var(--status-curso); background: rgb(var(--warning-500) / .12); }
     .gpt-status-tag[data-status="curso"]::before { background: var(--status-curso); }
-    .gpt-status-tag[data-status="capturando"] { color: var(--status-capturando); background: rgba(79,134,173,.14); }
+    .gpt-status-tag[data-status="capturando"] { color: var(--status-capturando); background: rgb(var(--info-500) / .12); }
     .gpt-status-tag[data-status="capturando"]::before { background: var(--status-capturando); }
-    .gpt-status-tag[data-status="confirmacion"] { color: var(--status-confirmacion); background: rgba(141,118,184,.14); }
+    .gpt-status-tag[data-status="confirmacion"] { color: var(--status-confirmacion); background: rgb(var(--primary-500) / .12); }
     .gpt-status-tag[data-status="confirmacion"]::before { background: var(--status-confirmacion); }
-    .gpt-status-tag[data-status="completado"] { color: var(--status-completado); background: rgba(47,158,125,.14); }
+    .gpt-status-tag[data-status="completado"] { color: var(--status-completado); background: rgb(var(--success-500) / .12); }
     .gpt-status-tag[data-status="completado"]::before { background: var(--status-completado); }
 
     /* ---------- Center column ---------- */
@@ -281,7 +306,7 @@
         align-items: center;
         justify-content: space-between;
         gap: 10px;
-        padding: 12px 22px;
+        padding: 14px 28px;
         border-bottom: 1px solid var(--border);
         background: linear-gradient(180deg, var(--bg-panel), var(--bg-base));
     }
@@ -312,7 +337,7 @@
         overflow-y: auto;
         min-height: 0;
         min-width: 0;
-        padding: 22px 24px;
+        padding: 30px 36px;
         scroll-behavior: smooth;
     }
     #gpt-messages::-webkit-scrollbar { width: 6px; }
@@ -324,11 +349,11 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        width: min(620px, 100%);
+        width: min(820px, 100%);
         min-height: 100%;
         margin: 0 auto;
-        padding: 30px 18px;
-        gap: 13px;
+        padding: 48px 28px;
+        gap: 16px;
         text-align: center;
     }
     .gpt-empty-avatar {
@@ -341,7 +366,7 @@
         font-size: 21px;
         color: var(--accent-strong);
         background: var(--accent-soft);
-        border: 1px solid rgba(42,150,131,.35);
+        border: 1px solid rgb(var(--primary-500) / .30);
     }
     #gpt-empty h1 {
         font-size: clamp(20px, 2.6vw, 25px);
@@ -350,7 +375,7 @@
         letter-spacing: -0.01em;
     }
     #gpt-empty p {
-        max-width: 480px;
+        max-width: 620px;
         color: var(--text-muted);
         font-size: 13.5px;
         line-height: 1.6;
@@ -360,12 +385,12 @@
         flex-wrap: wrap;
         gap: 8px;
         justify-content: center;
-        max-width: 560px;
-        margin-top: 10px;
+        max-width: 760px;
+        margin-top: 14px;
     }
     .gpt-chip {
-        padding: 8px 13px;
-        border-radius: 6px;
+        padding: 10px 16px;
+        border-radius: 9px;
         border: 1px solid var(--border);
         background: var(--bg-elevated);
         color: var(--text-secondary);
@@ -384,20 +409,21 @@
     /* message rows: ticket-style, not chat bubbles */
     .gpt-row {
         width: 100%;
-        padding: 6px 0;
+        padding: 10px 0;
     }
     .gpt-row-inner {
-        max-width: 760px;
+        width: min(100%, 1080px);
+        max-width: 1080px;
         margin: 0 auto;
         display: flex;
-        gap: 10px;
+        gap: 14px;
         align-items: flex-start;
     }
     .gpt-row.user .gpt-row-inner { flex-direction: row-reverse; }
     .gpt-avatar {
-        width: 30px;
-        height: 30px;
-        border-radius: 7px;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
         flex-shrink: 0;
         display: flex;
         align-items: center;
@@ -407,32 +433,32 @@
         border: 1px solid var(--border);
     }
     .gpt-avatar.user { background: var(--bg-elevated-2); color: var(--text-secondary); }
-    .gpt-avatar.ai { background: var(--accent-soft); color: var(--accent-strong); border-color: rgba(42,150,131,.35); }
+    .gpt-avatar.ai { background: var(--accent-soft); color: var(--accent-strong); border-color: rgb(var(--primary-500) / .30); }
     .gpt-message-stack {
         display: flex;
         flex-direction: column;
         align-items: flex-start;
-        max-width: min(80%, 640px);
+        max-width: min(86%, 900px);
     }
     .gpt-row.user .gpt-message-stack { align-items: flex-end; }
     .gpt-sender {
         padding: 0 3px;
-        margin-bottom: 4px;
-        font-size: 10.5px;
+        margin-bottom: 6px;
+        font-size: 11px;
         font-weight: 650;
         letter-spacing: .02em;
         color: var(--text-muted);
         text-transform: uppercase;
     }
     .gpt-msg {
-        padding: 11px 14px;
+        padding: 14px 17px;
         border: 1px solid var(--border);
         border-left: 3px solid var(--text-secondary);
-        border-radius: 6px;
+        border-radius: 10px;
         background: var(--bg-elevated);
-        font-size: 13.5px;
-        line-height: 1.62;
-        color: #e7eaef;
+        font-size: 14px;
+        line-height: 1.68;
+        color: var(--text-primary);
         white-space: pre-wrap;
         word-break: break-word;
     }
@@ -441,7 +467,7 @@
         border-left: none;
         border-right: 3px solid var(--text-secondary);
         background: var(--bg-elevated-2);
-        color: #f1f3f6;
+        color: var(--text-primary);
     }
     .typing-dots { display: flex; gap: 5px; padding-top: 2px; }
     .typing-dots span {
@@ -461,9 +487,9 @@
     .gpt-confirm-card {
         margin-top: 8px;
         padding: 14px 15px;
-        border: 1px solid rgba(42,150,131,.4);
+        border: 1px solid rgb(var(--primary-500) / .35);
         border-radius: 7px;
-        background: linear-gradient(180deg, rgba(42,150,131,.12), rgba(42,150,131,.04));
+        background: linear-gradient(180deg, rgb(var(--primary-500) / .10), rgb(var(--primary-500) / .03));
     }
     .gpt-confirm-head {
         display: flex;
@@ -481,7 +507,7 @@
     .gpt-confirm-pill {
         padding: 2px 8px;
         border-radius: 4px;
-        background: rgba(201,138,61,.16);
+        background: rgb(var(--warning-500) / .13);
         color: var(--status-curso);
         font-size: 10px;
         font-weight: 700;
@@ -500,9 +526,9 @@
 
     /* ---------- Right: resumen del trámite ---------- */
     #gpt-summary {
-        width: 280px;
-        flex: 0 0 280px;
-        padding: 18px 16px;
+        width: 320px;
+        flex: 0 0 320px;
+        padding: 24px 22px;
         overflow-y: auto;
         border-left: 1px solid var(--border);
         background: var(--bg-panel);
@@ -545,10 +571,10 @@
     }
     .gpt-summary-grid {
         display: grid;
-        gap: 12px;
+        gap: 16px;
     }
     .gpt-summary-grid > div {
-        padding-bottom: 10px;
+        padding-bottom: 14px;
         border-bottom: 1px solid var(--border-soft);
     }
     .gpt-summary-grid dt {
@@ -576,7 +602,7 @@
         display: flex;
         justify-content: space-between;
         gap: 8px;
-        padding: 7px 9px;
+        padding: 10px 11px;
         border: 1px solid var(--border-soft);
         border-radius: 5px;
         background: var(--bg-elevated);
@@ -590,20 +616,20 @@
         position: sticky;
         bottom: 0;
         flex: 0 0 auto;
-        padding: 13px 24px 16px;
+        padding: 16px 32px 20px;
         border-top: 1px solid var(--border);
         background: var(--bg-panel);
     }
     .gpt-input-wrap {
-        max-width: 760px;
+        max-width: 1080px;
         margin: 0 auto;
         background: var(--bg-elevated);
         border: 1px solid var(--border);
-        border-radius: 9px;
+        border-radius: 12px;
         display: flex;
         align-items: center;
-        padding: 8px;
-        gap: 8px;
+        padding: 10px;
+        gap: 10px;
         transition: border-color .2s;
     }
     .gpt-input-wrap:focus-within { border-color: var(--accent-strong); }
@@ -650,7 +676,7 @@
         animation: gpt-mic-pulse 1s ease-in-out infinite;
     }
     #gpt-mic.is-processing {
-        color: #1c1404;
+        color: #111827;
         background: var(--status-curso);
         border-color: var(--status-curso);
     }
@@ -662,7 +688,7 @@
         cursor: not-allowed;
         opacity: 0.7;
     }
-    @keyframes gpt-mic-pulse { 50% { box-shadow: 0 0 0 5px rgba(193,85,76,.2); } }
+    @keyframes gpt-mic-pulse { 50% { box-shadow: 0 0 0 5px rgb(var(--danger-500) / .20); } }
     #gpt-send {
         width: 36px; height: 36px;
         border-radius: 7px;
@@ -680,25 +706,26 @@
     #gpt-send svg { width: 16px; height: 16px; }
     #gpt-error {
         display: none;
-        max-width: 760px;
+        max-width: 1080px;
         margin: 0 auto 8px;
         padding: 7px 11px;
-        background: rgba(193,85,76,.12);
-        border: 1px solid rgba(193,85,76,.4);
+        background: rgb(var(--danger-500) / .10);
+        border: 1px solid rgb(var(--danger-500) / .35);
         border-radius: 6px;
         font-size: 12px;
-        color: #f3c9c5;
+        color: rgb(var(--danger-600));
     }
+    .dark #gpt-error { color: rgb(var(--danger-300)); }
     .gpt-footer-note {
         text-align: center;
         font-size: 10.5px;
         color: var(--text-muted);
-        max-width: 760px;
+        max-width: 1080px;
         margin: 7px auto 0;
     }
 
     /* ---------- Responsive ---------- */
-    @media (max-width: 1080px) {
+    @media (max-width: 1450px) {
         #gpt-summary {
             position: absolute;
             z-index: 19;
@@ -716,7 +743,7 @@
     @media (max-width: 768px) {
         #gpt-shell {
             height: calc(100dvh - 118px);
-            min-height: 540px;
+            min-height: 520px;
             border-radius: 12px;
         }
         .gpt-chat-header { padding: 12px 14px; }
@@ -760,10 +787,15 @@
 <div id="gpt-shell">
     <header class="gpt-chat-header">
         <div class="gpt-chat-heading">
-            <div class="gpt-header-avatar" aria-hidden="true">&#9776;</div>
+            <div class="gpt-header-avatar" aria-hidden="true">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/>
+                    <path d="M8 9h8M8 13h5"/>
+                </svg>
+            </div>
             <div class="gpt-header-copy">
-                <h2>Centro de atención de trámites</h2>
-                <p>Soluciones Edgar &middot; consulta, captura datos y genera solicitudes</p>
+                <h2>Asistente virtual</h2>
+                <p>Consulta, captura datos y genera solicitudes en Soluciones Edgar</p>
             </div>
         </div>
         <div class="gpt-header-actions">
@@ -808,7 +840,12 @@
             <div class="gpt-main-row">
                 <div id="gpt-messages">
                     <div id="gpt-empty">
-                        <div class="gpt-empty-avatar" aria-hidden="true">&#9776;</div>
+                        <div class="gpt-empty-avatar" aria-hidden="true">
+                            <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/>
+                                <path d="M8 9h8M8 13h5"/>
+                            </svg>
+                        </div>
                         <h1>¿Qué trámite necesitas gestionar?</h1>
                         <p>Selecciona una opción o escribe lo que necesitas. El asistente te guiará paso a paso.</p>
                         <div class="gpt-chips">
@@ -947,7 +984,7 @@
             inner.className = 'gpt-row-inner';
             const avatar = document.createElement('div');
             avatar.className = 'gpt-avatar ' + type;
-            avatar.textContent = type === 'user' ? 'Tú' : '✦';
+            avatar.textContent = type === 'user' ? 'Tú' : 'IA';
             avatar.setAttribute('aria-hidden', 'true');
             const right = document.createElement('div');
             right.className = 'gpt-message-stack';
@@ -974,7 +1011,12 @@
 
         function emptyStateMarkup() {
             return `
-                <div class="gpt-empty-avatar" aria-hidden="true">&#9776;</div>
+                <div class="gpt-empty-avatar" aria-hidden="true">
+                    <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/>
+                        <path d="M8 9h8M8 13h5"/>
+                    </svg>
+                </div>
                 <h1>¿Qué trámite necesitas gestionar?</h1>
                 <p>Selecciona una opción o escribe lo que necesitas. El asistente te guiará paso a paso.</p>
                 <div class="gpt-chips">
