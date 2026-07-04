@@ -16,6 +16,57 @@ Route::get('/login', function () {
     return redirect('/app/login');
 })->name('login');
 
+Route::get('/admin/direct-login', function () {
+    if (auth()->check()) {
+        return redirect('/admin/a-i-chat');
+    }
+
+    $error = session('direct_login_error');
+    $csrf = csrf_field();
+
+    return response(
+        '<!doctype html><html lang="es"><head><meta charset="utf-8">'
+        . '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        . '<title>Acceso directo - Soluciones Edgar</title>'
+        . '<style>'
+        . 'body{margin:0;min-height:100vh;display:grid;place-items:center;background:#111827;color:#f9fafb;font-family:system-ui,-apple-system,Segoe UI,sans-serif}'
+        . 'form{width:min(92vw,420px);background:#18181b;border:1px solid #27272a;border-radius:24px;padding:28px;box-shadow:0 24px 80px #0008}'
+        . 'h1{margin:0 0 8px;font-size:26px}p{margin:0 0 22px;color:#a1a1aa}'
+        . 'label{display:block;margin:14px 0 7px;font-weight:700}'
+        . 'input{width:100%;box-sizing:border-box;border:1px solid #3f3f46;border-radius:14px;background:#09090b;color:#fff;padding:14px 16px;font-size:16px}'
+        . 'button{width:100%;margin-top:22px;border:0;border-radius:14px;background:#38bdf8;color:#082f49;padding:14px 16px;font-size:17px;font-weight:800}'
+        . '.error{background:#7f1d1d;color:#fecaca;border:1px solid #ef4444;border-radius:14px;padding:12px 14px;margin-bottom:16px}'
+        . '.hint{margin-top:16px;font-size:13px;color:#a1a1aa}</style></head><body>'
+        . '<form method="post" action="/admin/direct-login" autocomplete="on">'
+        . $csrf
+        . '<h1>Soluciones Edgar</h1><p>Acceso alternativo para la demo.</p>'
+        . ($error ? '<div class="error">' . e($error) . '</div>' : '')
+        . '<label for="email">Correo electrónico</label>'
+        . '<input id="email" name="email" type="email" value="solucionesedgar@gmail.com" required autofocus>'
+        . '<label for="password">Contraseña</label>'
+        . '<input id="password" name="password" type="password" required>'
+        . '<button type="submit">Entrar</button>'
+        . '<div class="hint">Usa: solucionesedgar@gmail.com / Password123!</div>'
+        . '</form></body></html>'
+    );
+})->middleware('guest')->name('admin.direct-login');
+
+Route::post('/admin/direct-login', function (\Illuminate\Http\Request $request) {
+    $credentials = $request->validate([
+        'email' => ['required', 'email'],
+        'password' => ['required', 'string'],
+    ]);
+
+    if (!\Illuminate\Support\Facades\Auth::attempt($credentials, true)) {
+        return redirect('/admin/direct-login')
+            ->with('direct_login_error', 'Correo o contraseña incorrectos.');
+    }
+
+    $request->session()->regenerate();
+
+    return redirect('/admin/a-i-chat');
+})->middleware('guest');
+
 Route::get('/support/whatsapp', \App\Http\Controllers\SupportRedirectController::class)
     ->middleware('auth')
     ->name('support.whatsapp');
@@ -416,6 +467,19 @@ Route::post('/ia-test', function () {
                 $tokenCount            = 0;
                 $ttftMs                = null;
                 $activeGenerationStart = null;
+                $flushStream = static function (): void {
+                    if (ob_get_level() > 0) {
+                        @ob_flush();
+                    }
+                    flush();
+                };
+
+                echo "data: " . json_encode([
+                    'type'            => 'conversation',
+                    'conversation_id' => $conversation->conversation_id,
+                ]) . "\n\n";
+                $flushStream();
+
                 $businessResponse = $procedureFlowResponse ?? $generateSimpleResponse(
                     $pregunta,
                     $conversationHistory,
@@ -429,11 +493,11 @@ Route::post('/ia-test', function () {
 
                 $onChunk = function (array $data) use (
                     &$fullResponse, &$ttftRecorded, &$tokenCount,
-                    &$ttftMs, &$activeGenerationStart, $startTime
+                    &$ttftMs, &$activeGenerationStart, $startTime, $flushStream
                 ) {
                     if (isset($data['status'])) {
                         echo "data: " . json_encode(['type' => 'status', 'status' => $data['status']]) . "\n\n";
-                        ob_flush(); flush();
+                        $flushStream();
                     } elseif (isset($data['token'])) {
                         if (!$ttftRecorded) {
                             $ttftMs                = round((microtime(true) - $startTime) * 1000, 2);
@@ -443,7 +507,7 @@ Route::post('/ia-test', function () {
                         $tokenCount++;
                         $fullResponse .= $data['token'];
                         echo "data: " . json_encode(['type' => 'token', 'token' => $data['token']]) . "\n\n";
-                        ob_flush(); flush();
+                        $flushStream();
                     } elseif (isset($data['respuesta'])) {
                         if (!$ttftRecorded) {
                             $ttftMs       = round((microtime(true) - $startTime) * 1000, 2);
@@ -452,10 +516,10 @@ Route::post('/ia-test', function () {
                         $tokenCount   += (int) ceil(strlen($data['respuesta']) / 4);
                         $fullResponse .= $data['respuesta'];
                         echo "data: " . json_encode(['type' => 'token', 'token' => $data['respuesta']]) . "\n\n";
-                        ob_flush(); flush();
+                        $flushStream();
                     } elseif (isset($data['error'])) {
                         echo "data: " . json_encode(['type' => 'error', 'error' => $data['error']]) . "\n\n";
-                        ob_flush(); flush();
+                        $flushStream();
                     }
                 };
 
@@ -465,7 +529,7 @@ Route::post('/ia-test', function () {
                     $fullResponse = $businessResponse;
                     $tokenCount = max(1, (int) ceil(strlen($fullResponse) / 4));
                     echo "data: " . json_encode(['type' => 'token', 'token' => $fullResponse]) . "\n\n";
-                    ob_flush(); flush();
+                    $flushStream();
                     $success = false;
                 } else {
                     $success = $ragBridge->stream($preguntaConContexto, $onChunk);
@@ -483,7 +547,7 @@ Route::post('/ia-test', function () {
                     $tokenCount   = max(1, (int) ceil(strlen($fullResponse) / 4));
 
                     echo "data: " . json_encode(['type' => 'error', 'error' => $fullResponse]) . "\n\n";
-                    ob_flush(); flush();
+                    $flushStream();
                 }
 
                 // Guardar mensaje asistente
@@ -530,7 +594,7 @@ Route::post('/ia-test', function () {
                     'conversation_id' => $conversation->conversation_id,
                     'metadata'        => ['conversation_completed' => $isCompleted],
                 ]) . "\n\n";
-                ob_flush(); flush();
+                $flushStream();
             },
             200,
             [

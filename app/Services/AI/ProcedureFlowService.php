@@ -53,6 +53,10 @@ class ProcedureFlowService
             );
         }
 
+        if ($this->isCapabilityQuestion($normalized)) {
+            return $this->handled($this->capabilityResponse(), $state);
+        }
+
         $creationStatusResponse = $this->answerCreationStatusQuestion($normalized, $state);
         if ($creationStatusResponse !== null) {
             return $this->handled($creationStatusResponse, $state);
@@ -101,6 +105,10 @@ class ProcedureFlowService
             'cancela el tramite',
             'cancelar el tramite',
             'ya no quiero continuar',
+            'deten el tramite',
+            'detener tramite',
+            'mejor cancelalo',
+            'salir del tramite',
         ])) {
             if (!$state) {
                 return $this->handled('No hay un trámite activo para cancelar.', null);
@@ -118,6 +126,10 @@ class ProcedureFlowService
             'cambiar de tramite',
             'cambia el tramite',
             'quiero otro tramite',
+            'nuevo tramite',
+            'iniciar otro tramite',
+            'empezar otro tramite',
+            'vamos con otro tramite',
         ])) {
             $subjectName = $state['subject_name'] ?? $this->extractSubjectName($prompt);
             $state = $this->emptyState($subjectName);
@@ -248,20 +260,45 @@ class ProcedureFlowService
             'cual fue el ultimo tramite',
             'ultimo tramite que estaba haciendo',
             'que tramite estaba haciendo',
+            'que tramite hice',
+            'que estaba haciendo',
+            'ultimo tramite',
+            'mi ultimo tramite',
         ]);
-        $isMissing = $this->matches($normalized, ['que datos faltan', 'cuales datos faltan', 'que falta']);
-        $isCurrent = $this->matches($normalized, ['que dato me pediste', 'cual dato me pediste', 'que dato solicitaste']);
+        $isMissing = $this->matches($normalized, [
+            'que datos faltan',
+            'cuales datos faltan',
+            'que falta',
+            'que dato falta',
+            'que me falta',
+            'que falta capturar',
+        ]);
+        $isCurrent = $this->matches($normalized, [
+            'que dato me pediste',
+            'cual dato me pediste',
+            'que dato solicitaste',
+            'que dato sigue',
+            'que me pediste',
+            'que necesitas ahora',
+        ]);
         $isSubject = $this->matches($normalized, [
             'para quien era el tramite',
             'como se llama la persona',
             'quien es la persona',
             'a nombre de quien',
             'como me llamo y que tramite necesito',
+            'para quien es',
+            'para quien era',
+            'quien era el cliente',
+            'a quien le estoy haciendo el tramite',
         ]);
         $isDataSummary = $this->matches($normalized, [
             'datos del ultimo tramite',
             'cuales fueron los datos',
             'que datos capture',
+            'resumen del tramite',
+            'muestrame los datos',
+            'datos capturados',
         ]);
 
         if (!$isLastProcedure && !$isMissing && !$isCurrent && !$isSubject && !$isDataSummary) {
@@ -273,7 +310,7 @@ class ProcedureFlowService
         }
 
         $subject = $state['subject_name'] ?? null;
-        if ($isLastProcedure) {
+        if ($isLastProcedure && !$isDataSummary) {
             $response = $subject
                 ? "Estabas realizando el trámite {$state['service_name']} para {$subject}."
                 : "Estabas realizando el trámite {$state['service_name']}.";
@@ -332,6 +369,13 @@ class ProcedureFlowService
             'cual es el folio',
             'cual es la solicitud',
             'ya fue creada',
+            'ya quedo',
+            'ya quedo la solicitud',
+            'ya la creaste',
+            'numero de solicitud',
+            'id de orden',
+            'folio de la solicitud',
+            'dame el folio',
         ])) {
             return null;
         }
@@ -455,6 +499,14 @@ class ProcedureFlowService
 
         $preferredCodes = [
             'acta de nacimiento' => 'ACT-NAC',
+            'acta nacimiento' => 'ACT-NAC',
+            'acta de defuncion' => 'ACT-DEF',
+            'acta defuncion' => 'ACT-DEF',
+            'acta de divorcio' => 'ACT-DIV',
+            'acta divorcio' => 'ACT-DIV',
+            'acta de matrimonio' => 'ACT-MAT',
+            'acta matrimonio' => 'ACT-MAT',
+            'antecedentes no penales' => 'ANP-01',
             'constancia de situacion fiscal' => 'CSF-02',
             'constancia fiscal' => 'CSF-02',
             'descarga de constancia' => 'CSF-02',
@@ -462,6 +514,26 @@ class ProcedureFlowService
             'consultar rfc' => 'CSF-02',
             'para rfc' => 'CSF-02',
             'curp' => 'CURP-01',
+            'nss' => 'NSS-02',
+            'numero de seguro social' => 'NSS-02',
+            'seguro social' => 'NSS-02',
+            'semanas cotizadas' => 'NSS-03',
+            'vigencia de derechos' => 'NSS-01',
+            'afore' => 'AFO-01',
+            'idcif' => 'IDCIF-01',
+            'recibo cfe' => 'CFE-01',
+            'cfe' => 'CFE-01',
+            'repuve' => 'HOJ-REP',
+            'hoja repuve' => 'HOJ-REP',
+            'tenencia cdmx' => 'FP-TCDMX',
+            'tenencia ciudad de mexico' => 'FP-TCDMX',
+            'tenencia edomex' => 'FP-TEDOMX',
+            'tenencia estado de mexico' => 'FP-TEDOMX',
+            'cuenta infonavit' => 'EDO-INF',
+            'estado de cuenta infonavit' => 'EDO-INF',
+            'recuperar clave infonavit' => 'REC-INF',
+            'reporte historico infonavit' => 'REPHIS-INF',
+            'resumen credito infonavit' => 'RESCRED-INF',
         ];
 
         foreach ($preferredCodes as $phrase => $code) {
@@ -593,6 +665,25 @@ class ProcedureFlowService
         return "¿Qué trámite necesitas? Puedo ayudarte con: {$options}.";
     }
 
+    private function capabilityResponse(): string
+    {
+        $services = $this->availableServices();
+        $options = $services->take(8)->pluck('name')->implode(', ');
+
+        $response = 'Puedo ayudarte a consultar trámites, capturar sus datos, '
+            . 'crear solicitudes y revisar el estado o folio de una solicitud anterior.';
+
+        if ($options !== '') {
+            $response .= " Algunos servicios disponibles son: {$options}.";
+        }
+
+        return $response
+            . ' Puedes decir, por ejemplo: "CURP para Kevin Montero", '
+            . '"¿Qué datos faltan?", "si, hazlo", "¿cuál fue el último trámite?", '
+            . '"cancela este trámite" o "quiero cambiar de trámite". '
+            . 'Dime qué trámite necesitas realizar.';
+    }
+
     private function extractSubjectName(string $prompt): ?string
     {
         $patterns = [
@@ -638,6 +729,26 @@ class ProcedureFlowService
             '/^(hola(?:\s+como estas)?|buenos dias|buenas tardes|buenas noches|que tal|ayuda)[.!?]*$/u',
             $normalized
         ) === 1;
+    }
+
+    private function isCapabilityQuestion(string $normalized): bool
+    {
+        return $this->matches($normalized, [
+            'en que me puedes ayudar',
+            'como me puedes ayudar',
+            'que puedes hacer',
+            'que sabes hacer',
+            'que tramites manejas',
+            'que servicios tienes',
+            'con que me ayudas',
+            'comandos disponibles',
+            'comandos del chat',
+            'que puedo escribir',
+            'que le puedo decir',
+            'ayuda del chat',
+            'menu de ayuda',
+            'opciones del asistente',
+        ]);
     }
 
     private function isCorruptState(array $state): bool
@@ -686,6 +797,11 @@ class ProcedureFlowService
             'necesito ayuda con un tramite',
             'necesito un tramite',
             'quiero un tramite',
+            'quiero hacer un tramite',
+            'necesito hacer un tramite',
+            'tramitar',
+            'hacer tramite',
+            'sacar tramite',
             'quiero de una',
             'quiero tramitar',
             'quiero sacar',

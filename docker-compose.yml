@@ -1,0 +1,78 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: soluciones-edgar-ia:semana-06
+    ports:
+      - "8000:8000"
+    environment:
+      APP_NAME: "Soluciones Edgar IA"
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: "${APP_URL:-http://localhost:8000}"
+      APP_KEY: "${APP_KEY:-base64:3V9YgkWl2rt3eBYNFoAONmKnfZ+QFclLBKvBoJYLC8M=}"
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: sqlite
+      DB_DATABASE: /var/www/html/database/database.sqlite
+      CACHE_STORE: database
+      SESSION_DRIVER: database
+      QUEUE_CONNECTION: "${QUEUE_CONNECTION:-database}"
+      MAIL_MAILER: "${MAIL_MAILER:-log}"
+      MAIL_SCHEME: "${MAIL_SCHEME:-}"
+      MAIL_HOST: "${MAIL_HOST:-127.0.0.1}"
+      MAIL_PORT: "${MAIL_PORT:-2525}"
+      MAIL_USERNAME: "${MAIL_USERNAME:-}"
+      MAIL_PASSWORD: "${MAIL_PASSWORD:-}"
+      MAIL_ENCRYPTION: "${MAIL_ENCRYPTION:-tls}"
+      MAIL_FROM_ADDRESS: "${MAIL_FROM_ADDRESS:-hello@example.com}"
+      MAIL_FROM_NAME: "${MAIL_FROM_NAME:-Soluciones Edgar IA}"
+      PYTHON_PATH: /usr/bin/python3
+      OLLAMA_URL: "${OLLAMA_URL:-http://host.docker.internal:11434/api/generate}"
+      RUN_MIGRATIONS: "true"
+      RUN_RAG_INGEST: "true"
+    volumes:
+      - ./database/database.sqlite:/var/www/html/database/database.sqlite
+      - ./storage:/var/www/html/storage
+      - ./rag/chroma_db:/var/www/html/rag/chroma_db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  queue:
+    image: soluciones-edgar-ia:semana-06
+    depends_on:
+      - backend
+    command: ["php", "artisan", "queue:work", "--sleep=1", "--tries=3", "--timeout=300"]
+    environment:
+      APP_NAME: "Soluciones Edgar IA"
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: "${APP_URL:-http://localhost:8000}"
+      APP_KEY: "${APP_KEY:-base64:3V9YgkWl2rt3eBYNFoAONmKnfZ+QFclLBKvBoJYLC8M=}"
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: sqlite
+      DB_DATABASE: /var/www/html/database/database.sqlite
+      CACHE_STORE: database
+      SESSION_DRIVER: database
+      QUEUE_CONNECTION: "${QUEUE_CONNECTION:-database}"
+      MAIL_MAILER: "${MAIL_MAILER:-log}"
+      MAIL_SCHEME: "${MAIL_SCHEME:-}"
+      MAIL_HOST: "${MAIL_HOST:-127.0.0.1}"
+      MAIL_PORT: "${MAIL_PORT:-2525}"
+      MAIL_USERNAME: "${MAIL_USERNAME:-}"
+      MAIL_PASSWORD: "${MAIL_PASSWORD:-}"
+      MAIL_ENCRYPTION: "${MAIL_ENCRYPTION:-tls}"
+      MAIL_FROM_ADDRESS: "${MAIL_FROM_ADDRESS:-hello@example.com}"
+      MAIL_FROM_NAME: "${MAIL_FROM_NAME:-Soluciones Edgar IA}"
+      PYTHON_PATH: /usr/bin/python3
+      OLLAMA_URL: "${OLLAMA_URL:-http://host.docker.internal:11434/api/generate}"
+      RUN_MIGRATIONS: "false"
+      RUN_RAG_INGEST: "false"
+    volumes:
+      - ./database/database.sqlite:/var/www/html/database/database.sqlite
+      - ./storage:/var/www/html/storage
+      - ./rag/chroma_db:/var/www/html/rag/chroma_db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

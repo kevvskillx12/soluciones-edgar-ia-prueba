@@ -16,11 +16,47 @@ if hasattr(sys.stdout, "reconfigure"):
 
 CHROMA_PATH = os.path.join(os.path.dirname(__file__), "chroma_db")
 COLECCION = "soluciones_edgar"
-OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/api/generate")
 MODELO = "llama3.2:1b"
 
 # Recupera más fragmentos para darle más contexto al modelo.
 TOP_K = 12
+
+
+def normalizar_texto(texto):
+    return (
+        texto.lower()
+        .replace("á", "a")
+        .replace("é", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ú", "u")
+        .replace("ü", "u")
+        .replace("ñ", "n")
+        .strip()
+    )
+
+
+def respuesta_capacidades(pregunta):
+    p = normalizar_texto(pregunta)
+
+    if not any(pattern in p for pattern in [
+        "en que me puedes ayudar",
+        "como me puedes ayudar",
+        "que puedes hacer",
+        "que sabes hacer",
+        "que tramites manejas",
+        "que servicios tienes",
+        "con que me ayudas",
+    ]):
+        return None
+
+    return (
+        "Puedo ayudarte a consultar tramites, capturar sus datos, crear solicitudes "
+        "y revisar el estado o folio de una solicitud anterior. Algunos servicios "
+        "disponibles son: CURP, acta de nacimiento, RFC, NSS y constancia fiscal. "
+        "Dime que tramite necesitas realizar."
+    )
 
 
 def respuesta_memoria_conversacional(pregunta):
@@ -474,6 +510,11 @@ def main():
         tramite_seguro = respuesta_tramite_seguro(pregunta_actual)
         if tramite_seguro:
             print(json.dumps({"respuesta": tramite_seguro}, ensure_ascii=False))
+            sys.exit(0)
+
+        capacidades = respuesta_capacidades(pregunta_actual)
+        if capacidades:
+            print(json.dumps({"respuesta": capacidades}, ensure_ascii=False))
             sys.exit(0)
 
         directa = respuesta_directa_si_aplica(pregunta_actual)

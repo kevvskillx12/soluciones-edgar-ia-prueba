@@ -559,6 +559,86 @@ class ProcedureFlowTest extends TestCase
     }
 
     /**
+     * @dataProvider capabilityPrompts
+     */
+    public function test_capability_questions_use_catalog_without_ollama(string $prompt): void
+    {
+        $parsed = $this->send($prompt);
+
+        $this->assertStringContainsString('Puedo ayudarte a consultar trámites', $parsed['respuesta']);
+        $this->assertStringContainsString('CURP Actualizada', $parsed['respuesta']);
+        $this->assertStringNotContainsString('depósito', mb_strtolower($parsed['respuesta']));
+        $this->assertSame(0, $this->fakeRagBridge->invocationCount);
+    }
+
+    public static function capabilityPrompts(): array
+    {
+        return [
+            ['en qué me puedes ayudar?'],
+            ['¿Qué puedes hacer?'],
+            ['quiero hacer algo, ¿cómo me puedes ayudar?'],
+            ['¿Qué trámites manejas?'],
+        ];
+    }
+
+    public function test_common_command_aliases_are_handled_without_ollama(): void
+    {
+        $first = $this->send('CURP para Kevin Montero');
+        $conversationId = $first['conversation_id'];
+
+        $this->assertStringContainsString('Kevin Montero', $first['respuesta']);
+        $this->assertStringContainsString('CURP', $first['respuesta']);
+
+        $missing = $this->send('que me falta', $conversationId);
+        $this->assertStringContainsString('Falta capturar: CURP.', $missing['respuesta']);
+
+        $current = $this->send('que dato sigue', $conversationId);
+        $this->assertStringContainsString('Te pedí el dato CURP.', $current['respuesta']);
+
+        $subject = $this->send('para quien es', $conversationId);
+        $this->assertStringContainsString('Kevin Montero', $subject['respuesta']);
+
+        $this->assertSame(0, $this->fakeRagBridge->invocationCount);
+    }
+
+    public function test_additional_service_aliases_enter_structured_flow(): void
+    {
+        Service::create([
+            'code' => 'NSS-02',
+            'name' => 'Localizar NSS con CURP',
+            'description' => 'Localizar NSS con CURP',
+            'price' => 10,
+            'cost' => 5,
+            'service_type' => 'SERVICIOS',
+            'processing_time' => '5 Minutos',
+            'active_schedule' => '24/7',
+            'is_active' => true,
+            'form_schema' => [
+                ['name' => 'curp', 'label' => 'CURP', 'type' => 'text', 'required' => true],
+            ],
+        ]);
+
+        $parsed = $this->send('necesito NSS para Kevin Montero');
+        $state = $this->state($parsed['conversation_id']);
+
+        $this->assertSame('NSS-02', $state['service_code']);
+        $this->assertStringContainsString('Kevin Montero', $parsed['respuesta']);
+        $this->assertSame(0, $this->fakeRagBridge->invocationCount);
+    }
+
+    public function test_capability_question_does_not_get_stuck_in_completed_flow(): void
+    {
+        $conversationId = $this->startActaFlowReadyToConfirm();
+        $this->send('si hazlo', $conversationId);
+
+        $parsed = $this->send('¿en qué me puedes ayudar?', $conversationId);
+
+        $this->assertStringContainsString('Puedo ayudarte a consultar trámites', $parsed['respuesta']);
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertSame('completed', $this->state($conversationId)['status']);
+    }
+
+    /**
      * @dataProvider legitimateFiscalPrompts
      */
     public function test_legitimate_fiscal_prompts_enter_structured_flow(string $prompt): void

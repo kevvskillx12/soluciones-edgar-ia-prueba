@@ -10,7 +10,7 @@ import time
 
 CHROMA_PATH = os.path.join(os.path.dirname(__file__), 'chroma_db')
 COLECCION   = 'soluciones_edgar'
-OLLAMA_URL  = 'http://localhost:11434/api/generate'
+OLLAMA_URL  = os.getenv('OLLAMA_URL', 'http://localhost:11434/api/generate')
 MODELO      = 'llama3.2:1b'
 TOP_K       = 12
 

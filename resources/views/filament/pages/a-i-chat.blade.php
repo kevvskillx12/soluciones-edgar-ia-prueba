@@ -1463,6 +1463,10 @@
                 if (contentType && contentType.includes('application/json')) {
                     const data = await response.json();
                     setStatus('ERROR');
+                    if (data.conversation_id) {
+                        conversationId = data.conversation_id;
+                        localStorage.setItem('ai_conversation_id', conversationId);
+                    }
                     currentMsgEl.textContent = data.respuesta || 'Error al procesar la respuesta.';
                     if (data.metadata && data.metadata.was_blocked) {
                         showError('Bloqueado por seguridad.');
@@ -1473,52 +1477,76 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder("utf-8");
                 let responseText = '';
+                let sseBuffer = '';
                 currentMsgEl.textContent = ''; // Limpiar los dots
+
+                const handleSseEvent = (eventBlock) => {
+                    const dataLines = eventBlock
+                        .split('\n')
+                        .filter((line) => line.startsWith('data: '))
+                        .map((line) => line.slice(6));
+
+                    if (!dataLines.length) return;
+
+                    const dataStr = dataLines.join('\n').trim();
+                    if (!dataStr) return;
+
+                    try {
+                        const data = JSON.parse(dataStr);
+                        if (data.type === 'conversation') {
+                            if (data.conversation_id) {
+                                conversationId = data.conversation_id;
+                                forceNewConversation = false;
+                                localStorage.setItem('ai_conversation_id', conversationId);
+                            }
+                        } else if (data.type === 'status') {
+                            setStatus(data.status);
+                        } else if (data.type === 'token') {
+                            setStatus('STREAMING...');
+                            responseText += data.token;
+                            currentMsgEl.textContent = responseText;
+                            messagesEl.scrollTop = messagesEl.scrollHeight;
+                        } else if (data.type === 'error') {
+                            setStatus('ERROR');
+                            showError(data.error);
+                        } else if (data.type === 'done') {
+                            setStatus('COMPLETED');
+                            if (data.conversation_id) {
+                                conversationId = data.conversation_id;
+                                forceNewConversation = false;
+                                localStorage.setItem('ai_conversation_id', conversationId);
+                            }
+                            if (data.metadata) {
+                                updateSummaryPanel(data.metadata);
+                                renderSolicitudCard(data.metadata);
+                            }
+                            if (data.metadata && (data.metadata.reset_conversation || data.metadata.conversation_completed)) {
+                                conversationId = null;
+                                localStorage.removeItem('ai_conversation_id');
+                            }
+                            loadHistory();
+                        }
+                    } catch (e) {
+                        console.error("Error parseando SSE chunk", dataStr, e);
+                    }
+                };
 
                 while (true) {
                     const { value, done } = await reader.read();
                     if (done) break;
 
                     const chunk = decoder.decode(value, { stream: true });
-                    const lines = chunk.split('\n');
+                    sseBuffer += chunk;
+                    const events = sseBuffer.split(/\n\n|\r\n\r\n/);
+                    sseBuffer = events.pop() || '';
 
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const dataStr = line.slice(6);
-                            if (!dataStr) continue;
-                            try {
-                                const data = JSON.parse(dataStr);
-                                if (data.type === 'status') {
-                                    setStatus(data.status);
-                                } else if (data.type === 'token') {
-                                    setStatus('STREAMING...');
-                                    responseText += data.token;
-                                    currentMsgEl.textContent = responseText;
-                                    messagesEl.scrollTop = messagesEl.scrollHeight;
-                                } else if (data.type === 'error') {
-                                    setStatus('ERROR');
-                                    showError(data.error);
-                                } else if (data.type === 'done') {
-                                    setStatus('COMPLETED');
-                                    if (data.conversation_id) {
-                                        conversationId = data.conversation_id;
-                                        localStorage.setItem('ai_conversation_id', conversationId);
-                                    }
-                                    if (data.metadata) {
-                                        updateSummaryPanel(data.metadata);
-                                        renderSolicitudCard(data.metadata);
-                                    }
-                                    if (data.metadata && (data.metadata.reset_conversation || data.metadata.conversation_completed)) {
-                                        conversationId = null;
-                                        localStorage.removeItem('ai_conversation_id');
-                                    }
-                                    loadHistory();
-                                }
-                            } catch (e) {
-                                console.error("Error parseando SSE chunk", dataStr, e);
-                            }
-                        }
+                    for (const eventBlock of events) {
+                        handleSseEvent(eventBlock);
                     }
+                }
+
+                if (sseBuffer.trim()) {
+                    handleSseEvent(sseBuffer);
                 }
             } catch (err) {
                 setStatus('ERROR');

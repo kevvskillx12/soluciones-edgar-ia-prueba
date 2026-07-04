@@ -8,8 +8,13 @@ class Login extends BaseLogin
 {
     public function mount(): void
     {
+        if (! auth()->check()) {
+            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                new \Illuminate\Http\RedirectResponse('/admin/direct-login')
+            );
+        }
+
         parent::mount();
-        
     }
 
     protected function getRedirectUrl(): string
