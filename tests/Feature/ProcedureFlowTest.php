@@ -393,6 +393,26 @@ class ProcedureFlowTest extends TestCase
         $this->assertSame('Kevin Montero', $this->state($first['conversation_id'])['subject_name']);
     }
 
+    public function test_direct_person_answer_is_saved_after_subject_question(): void
+    {
+        $first = $this->send('acta de nacimiento');
+        $parsed = $this->send('Kevin Montero', $first['conversation_id']);
+
+        $this->assertStringContainsString('Acta de Nacimiento para Kevin Montero', $parsed['respuesta']);
+        $this->assertStringContainsString('dato: CURP', $parsed['respuesta']);
+        $this->assertSame('Kevin Montero', $this->state($first['conversation_id'])['subject_name']);
+    }
+
+    public function test_incomplete_subject_answer_asks_for_full_name_without_looping(): void
+    {
+        $first = $this->send('acta de nacimiento');
+        $parsed = $this->send('Senor Montero', $first['conversation_id']);
+
+        $this->assertStringContainsString('nombre completo', $parsed['respuesta']);
+        $this->assertStringContainsString('Kevin Montero', $parsed['respuesta']);
+        $this->assertNull($this->state($first['conversation_id'])['subject_name']);
+    }
+
     public function test_tramitar_una_curp_never_becomes_subject_name(): void
     {
         $parsed = $this->send('quiero tramitar una curp');
@@ -623,6 +643,67 @@ class ProcedureFlowTest extends TestCase
 
         $this->assertSame('NSS-02', $state['service_code']);
         $this->assertStringContainsString('Kevin Montero', $parsed['respuesta']);
+        $this->assertSame(0, $this->fakeRagBridge->invocationCount);
+    }
+
+    public function test_rfc_alias_enters_structured_flow(): void
+    {
+        $first = $this->send('puedes tramitarme mi rfc');
+
+        $this->assertStringContainsString('¿Para quién es el trámite?', $first['respuesta']);
+        $this->assertSame('CSF con RFC y IDCIF', $this->state($first['conversation_id'])['service_name']);
+
+        $second = $this->send('Kevin Montero', $first['conversation_id']);
+
+        $this->assertStringContainsString('CSF con RFC y IDCIF para Kevin Montero', $second['respuesta']);
+        $this->assertStringContainsString('dato: RFC', $second['respuesta']);
+        $this->assertSame(0, $this->fakeRagBridge->invocationCount);
+    }
+
+    /**
+     * @dataProvider preparedContextPrompts
+     */
+    public function test_prepared_context_questions_are_handled_without_ollama(string $prompt, string $expected): void
+    {
+        $parsed = $this->send($prompt);
+
+        $this->assertStringContainsString($expected, $parsed['respuesta']);
+        $this->assertSame(0, $this->fakeRagBridge->invocationCount);
+    }
+
+    public static function preparedContextPrompts(): array
+    {
+        return [
+            ['¿quién eres?', 'Soy el asistente de Soluciones Edgar'],
+            ['¿cómo funciona el chat?', 'Funciona así'],
+            ['¿cuánto cuesta el acta de nacimiento?', 'Acta de Nacimiento tiene un costo'],
+            ['¿cuánto tarda el acta de nacimiento?', 'tiempo estimado'],
+            ['¿es seguro mandar mis datos?', 'Para seguridad'],
+            ['quiero pagar por deposito', 'no proceso depósitos'],
+            ['quiero hablar con una persona', 'atención humana'],
+            ['¿dónde veo mis solicitudes?', 'panel de la aplicación'],
+            ['cuéntame un chiste', 'trámites y solicitudes'],
+            ['servicios disponibles', 'Servicios disponibles'],
+            ['dame ejemplos de uso', 'Puedes escribir frases como'],
+            ['qué necesito para acta de nacimiento', 'Para Acta de Nacimiento necesito'],
+            ['haces curp', 'Sí, puedo ayudarte con CURP Actualizada'],
+            ['formato de rfc', 'El RFC normalmente usa'],
+            ['no me llega el correo para activar cuenta', 'tu cuenta esté activa'],
+            ['sale error y no responde', 'intenta actualizar la página'],
+            ['corregir dato', 'Puedes corregir datos'],
+            ['nuevo chat', 'botón "Nuevo chat"'],
+        ];
+    }
+
+    public function test_prepared_context_question_preserves_active_flow(): void
+    {
+        $first = $this->send('acta de nacimiento');
+        $conversationId = $first['conversation_id'];
+
+        $help = $this->send('no entiendo', $conversationId);
+
+        $this->assertStringContainsString('Necesito saber para quién es el trámite', $help['respuesta']);
+        $this->assertSame('awaiting_subject', $this->state($conversationId)['status']);
         $this->assertSame(0, $this->fakeRagBridge->invocationCount);
     }
 

@@ -57,6 +57,11 @@ class ProcedureFlowService
             return $this->handled($this->capabilityResponse(), $state);
         }
 
+        $preparedResponse = $this->answerPreparedQuestion($normalized, $state);
+        if ($preparedResponse !== null) {
+            return $this->handled($preparedResponse, $state);
+        }
+
         $creationStatusResponse = $this->answerCreationStatusQuestion($normalized, $state);
         if ($creationStatusResponse !== null) {
             return $this->handled($creationStatusResponse, $state);
@@ -159,6 +164,12 @@ class ProcedureFlowService
             $service = null;
         }
         $subjectName = $this->extractSubjectName($prompt);
+        if (!$subjectName
+            && !empty($state['service_id'])
+            && ($state['status'] ?? null) === 'awaiting_subject'
+            && !$service) {
+            $subjectName = $this->extractDirectSubjectName($prompt);
+        }
 
         if (!$state && $services->isEmpty() && $this->mentionsKnownService($normalized)) {
             return $this->notHandled();
@@ -199,6 +210,14 @@ class ProcedureFlowService
         if (!$state['subject_name']) {
             $state['status'] = 'awaiting_subject';
             $this->persistState($conversation, $state);
+
+            if (($state['service_id'] ?? null) && !$service && $this->looksLikeIncompleteSubjectResponse($prompt)) {
+                return $this->handled(
+                    "Necesito el nombre completo de la persona para el trámite {$state['service_name']}. "
+                    . 'Por ejemplo: "Kevin Montero".',
+                    $state
+                );
+            }
 
             return $this->handled(
                 "Seleccionaste el trámite {$state['service_name']}. ¿Para quién es el trámite?",
@@ -404,6 +423,445 @@ class ProcedureFlowService
         return 'La solicitud todavía no ha sido creada.';
     }
 
+    private function answerPreparedQuestion(string $normalized, ?array $state): ?string
+    {
+        if ($this->matches($normalized, [
+            'quien eres',
+            'que eres',
+            'eres humano',
+            'eres una persona',
+            'eres un bot',
+            'eres inteligencia artificial',
+            'como te llamas',
+        ])) {
+            return 'Soy el asistente de Soluciones Edgar. Puedo orientarte sobre trámites, capturar datos, '
+                . 'crear solicitudes y recordar el estado de esta conversación.';
+        }
+
+        if ($this->matches($normalized, [
+            'como funciona',
+            'como uso el chat',
+            'como empiezo',
+            'que hago primero',
+            'que sigue',
+            'pasos para usar',
+            'explicame el proceso',
+        ])) {
+            if ($state && !empty($state['service_name'])) {
+                return "Estamos con {$state['service_name']}. " . $this->nextStepHint($state);
+            }
+
+            return 'Funciona así: dime el trámite y la persona, te pediré solo los datos necesarios, '
+                . 'confirmaré el resumen y, cuando escribas "sí, hazlo", crearé la solicitud.';
+        }
+
+        if ($this->matches($normalized, [
+            'catalogo completo',
+            'catalogo de servicios',
+            'lista de servicios',
+            'todos los servicios',
+            'todos los tramites',
+            'que servicios manejan',
+            'servicios disponibles',
+        ])) {
+            return $this->catalogResponse();
+        }
+
+        if ($this->matches($normalized, [
+            'dame ejemplos',
+            'ejemplos de uso',
+            'frases de ejemplo',
+            'que puedo preguntar',
+            'como le pido un tramite',
+            'repertorio',
+            'menu',
+        ])) {
+            return $this->examplesResponse();
+        }
+
+        if ($this->matches($normalized, [
+            'que necesito',
+            'requisitos',
+            'que datos piden',
+            'que datos necesito',
+            'que documentos necesito',
+            'documentos necesarios',
+            'datos necesarios',
+        ])) {
+            return $this->requirementsResponse($normalized, $state);
+        }
+
+        if ($this->matches($normalized, [
+            'puedes hacer',
+            'pueden hacer',
+            'haces',
+            'manejas',
+            'tienes el tramite',
+            'tienen el tramite',
+            'trabajan',
+        ])) {
+            $availability = $this->serviceAvailabilityResponse($normalized);
+            if ($availability !== null) {
+                return $availability;
+            }
+        }
+
+        if ($this->matches($normalized, [
+            'formato de curp',
+            'como va la curp',
+            'curp valida',
+            'validar curp',
+            'formato de rfc',
+            'como va el rfc',
+            'rfc valido',
+            'validar rfc',
+        ])) {
+            return $this->formatHelpResponse($normalized);
+        }
+
+        if ($this->matches($normalized, [
+            'cuanto cuesta',
+            'cual es el costo',
+            'precio',
+            'tarifa',
+            'cuanto vale',
+            'cuanto cobran',
+        ])) {
+            return $this->priceResponse($normalized, $state);
+        }
+
+        if ($this->matches($normalized, [
+            'cuanto tarda',
+            'tiempo de entrega',
+            'cuando queda',
+            'en cuanto tiempo',
+            'horario',
+            'a que hora',
+            'estan abiertos',
+            'atienden',
+        ])) {
+            return $this->scheduleResponse($normalized, $state);
+        }
+
+        if ($this->matches($normalized, [
+            'es seguro',
+            'mis datos',
+            'privacidad',
+            'datos personales',
+            'puedo mandar documentos',
+            'documentos completos',
+            'informacion sensible',
+        ])) {
+            return 'Para seguridad, comparte solo los datos que el trámite solicite. '
+                . 'No envíes contraseñas, códigos bancarios ni información que no sea necesaria para la solicitud.';
+        }
+
+        if ($this->matches($normalized, [
+            'quiero pagar',
+            'como pago',
+            'deposito',
+            'transferencia',
+            'tarjeta',
+            'cuenta bancaria',
+            'transaccion financiera',
+        ])) {
+            return 'Desde este chat no proceso depósitos, transferencias ni datos bancarios. '
+                . 'Aquí puedo ayudarte a preparar y crear la solicitud del trámite disponible.';
+        }
+
+        if ($this->matches($normalized, [
+            'quiero hablar con una persona',
+            'asesor humano',
+            'soporte',
+            'contacto',
+            'whatsapp',
+            'administrador',
+        ])) {
+            return 'Puedo ayudarte desde el chat con trámites y solicitudes. '
+                . 'Si necesitas atención humana, revisa los datos de contacto oficiales de Soluciones Edgar o consulta al administrador.';
+        }
+
+        if ($this->matches($normalized, [
+            'no puedo entrar',
+            'no me deja entrar',
+            'no llega el correo',
+            'activar cuenta',
+            'verificar cuenta',
+            'olvide mi contrasena',
+            'recuperar contrasena',
+            'credenciales no coinciden',
+            'mi cuenta',
+        ])) {
+            return 'Si tienes problema con tu cuenta, revisa que el correo esté escrito completo, usa la opción de recuperar contraseña '
+                . 'si aplica y confirma con el administrador que tu cuenta esté activa. Por seguridad, no compartas contraseñas en el chat.';
+        }
+
+        if ($this->matches($normalized, [
+            'no funciona',
+            'sale error',
+            'me marca error',
+            'se trabo',
+            'se quedo cargando',
+            'no responde',
+            'fallo',
+            'problema con el chat',
+        ])) {
+            return 'Si algo falla, intenta actualizar la página y enviar el mensaje otra vez. '
+                . 'Si ya había un trámite en curso, puedo retomarlo con esta conversación usando el folio o el último estado guardado.';
+        }
+
+        if ($this->matches($normalized, [
+            'corregir dato',
+            'cambiar dato',
+            'me equivoque',
+            'dato incorrecto',
+            'editar dato',
+            'corrige el dato',
+        ])) {
+            if ($state && !empty($state['service_name'])) {
+                return null;
+            }
+
+            return 'Puedes corregir datos durante un trámite activo. Primero dime qué trámite necesitas realizar.';
+        }
+
+        if ($this->matches($normalized, [
+            'nuevo chat',
+            'nueva conversacion',
+            'empezar de cero',
+            'borrar conversacion',
+            'reiniciar chat',
+        ])) {
+            return 'Puedes usar el botón "Nuevo chat" para empezar una conversación limpia. '
+                . 'Si solo quieres cambiar de trámite aquí, escribe "quiero cambiar de trámite".';
+        }
+
+        if ($this->matches($normalized, [
+            'donde veo mis solicitudes',
+            'donde veo mi pedido',
+            'donde reviso la orden',
+            'donde esta mi solicitud',
+            'historial de solicitudes',
+            'mis ordenes',
+            'mis pedidos',
+        ])) {
+            return 'Puedes revisar tus solicitudes en el panel de la aplicación. '
+                . 'Si esta conversación ya creó una solicitud, también puedo decirte el ID o folio aquí mismo.';
+        }
+
+        if ($this->matches($normalized, [
+            'gracias',
+            'muchas gracias',
+            'ok gracias',
+            'perfecto gracias',
+        ])) {
+            return $state && !empty($state['service_name'])
+                ? "Con gusto. Seguimos con el trámite {$state['service_name']} cuando quieras."
+                : 'Con gusto. Cuando quieras, dime qué trámite necesitas realizar.';
+        }
+
+        if ($this->matches($normalized, [
+            'adios',
+            'hasta luego',
+            'nos vemos',
+            'bye',
+            'salir',
+        ])) {
+            return 'De acuerdo. Cuando necesites otro trámite, aquí estaré para ayudarte.';
+        }
+
+        if ($this->matches($normalized, [
+            'no entiendo',
+            'me confundi',
+            'estoy confundido',
+            'explicalo mejor',
+            'que significa',
+        ])) {
+            return $state && !empty($state['service_name'])
+                ? "No te preocupes. Estamos con {$state['service_name']}. "
+                    . $this->nextStepHint($state)
+                : 'No te preocupes. Solo dime el trámite que necesitas, por ejemplo: CURP, acta de nacimiento, RFC, NSS o constancia fiscal.';
+        }
+
+        if ($this->isClearlyOutOfScopeQuestion($normalized)) {
+            return 'Puedo ayudarte principalmente con trámites y solicitudes de Soluciones Edgar. '
+                . 'Si quieres, dime qué trámite necesitas o escribe "qué trámites manejas".';
+        }
+
+        return null;
+    }
+
+    private function priceResponse(string $normalized, ?array $state): string
+    {
+        $service = $this->serviceFromStateOrPrompt($state, $normalized);
+
+        if ($service) {
+            return "El trámite {$service->name} tiene un costo de \${$service->price}. "
+                . 'Si quieres iniciarlo, dime para quién es.';
+        }
+
+        return 'El costo depende del trámite. Dime cuál necesitas, por ejemplo CURP, acta de nacimiento, RFC o NSS, y te ayudo a identificarlo.';
+    }
+
+    private function scheduleResponse(string $normalized, ?array $state): string
+    {
+        $service = $this->serviceFromStateOrPrompt($state, $normalized);
+
+        if ($service) {
+            return "Para {$service->name}, el horario configurado es {$service->active_schedule} "
+                . "y el tiempo estimado es {$service->processing_time}.";
+        }
+
+        return 'El horario y tiempo dependen del trámite. Dime cuál necesitas y te indico la información disponible.';
+    }
+
+    private function catalogResponse(): string
+    {
+        $services = $this->availableServices();
+
+        if ($services->isEmpty()) {
+            return 'Por ahora no hay servicios activos cargados en el catálogo.';
+        }
+
+        $options = $services
+            ->take(20)
+            ->pluck('name')
+            ->implode(', ');
+
+        $suffix = $services->count() > 20
+            ? ' Hay más servicios en el catálogo; dime el nombre o tipo de trámite que buscas.'
+            : '';
+
+        return "Servicios disponibles: {$options}.{$suffix} Para iniciar uno, escribe algo como: \"Acta de nacimiento para Kevin Montero\".";
+    }
+
+    private function examplesResponse(): string
+    {
+        return 'Puedes escribir frases como: "CURP para Kevin Montero", "acta de nacimiento para Luis Ek", '
+            . '"puedes tramitarme mi RFC", "qué datos faltan", "qué dato me pediste", '
+            . '"cuánto cuesta el acta de nacimiento", "si, hazlo", "ya la hiciste", '
+            . '"cancela este trámite" o "quiero cambiar de trámite".';
+    }
+
+    private function requirementsResponse(string $normalized, ?array $state): string
+    {
+        $service = $this->serviceFromStateOrPrompt($state, $normalized);
+
+        if (!$service) {
+            return 'Dime de qué trámite quieres conocer requisitos, por ejemplo: "qué necesito para acta de nacimiento" o "requisitos para RFC".';
+        }
+
+        $fields = collect($service->form_schema ?? [])
+            ->filter(fn ($field) => (bool) ($field['required'] ?? false))
+            ->map(fn ($field) => (string) ($field['label'] ?? $field['name']))
+            ->filter()
+            ->values()
+            ->all();
+
+        if (empty($fields)) {
+            return "El trámite {$service->name} no tiene datos obligatorios configurados en este momento.";
+        }
+
+        if ($state && !empty($state['service_id']) && (int) $state['service_id'] === (int) $service->id) {
+            $missing = $this->missingLabels($state);
+
+            return $missing
+                ? "Para {$service->name} falta capturar: " . implode(', ', $missing) . '.'
+                : "Para {$service->name} ya tengo capturados los datos requeridos.";
+        }
+
+        return "Para {$service->name} necesito: " . implode(', ', $fields) . '.';
+    }
+
+    private function serviceAvailabilityResponse(string $normalized): ?string
+    {
+        $service = $this->detectService($normalized, $this->availableServices());
+
+        if (!$service) {
+            return null;
+        }
+
+        return "Sí, puedo ayudarte con {$service->name}. "
+            . "Costo configurado: \${$service->price}. Tiempo estimado: {$service->processing_time}. "
+            . 'Para iniciarlo, dime para quién es el trámite.';
+    }
+
+    private function formatHelpResponse(string $normalized): string
+    {
+        if (str_contains($normalized, 'rfc')) {
+            return 'El RFC normalmente usa 12 o 13 caracteres: letras iniciales, fecha en formato AAMMDD y homoclave. '
+                . 'Puedo revisar el formato básico cuando lo captures, pero la validez oficial depende del SAT.';
+        }
+
+        return 'La CURP normalmente tiene 18 caracteres con letras, fecha, sexo, entidad y homoclave. '
+            . 'Puedo revisar el formato básico cuando la captures, pero la validez oficial depende de la fuente oficial.';
+    }
+
+    private function serviceFromStateOrPrompt(?array $state, string $normalized): ?Service
+    {
+        if (!empty($state['service_id'])) {
+            return Service::find($state['service_id']);
+        }
+
+        return $this->detectService($normalized, $this->availableServices());
+    }
+
+    private function nextStepHint(array $state): string
+    {
+        if (($state['status'] ?? null) === 'awaiting_subject') {
+            return 'Necesito saber para quién es el trámite.';
+        }
+
+        if (($state['status'] ?? null) === 'collecting') {
+            $current = $this->currentFieldDefinition($state);
+
+            return $current
+                ? "El dato pendiente es {$current['label']}."
+                : 'Todavía faltan datos por capturar.';
+        }
+
+        if (($state['status'] ?? null) === 'ready_to_confirm') {
+            return 'Ya tengo los datos; falta que confirmes si deseas crear la solicitud.';
+        }
+
+        if (($state['status'] ?? null) === 'completed' && !empty($state['order_id'])) {
+            return "La solicitud ya fue creada con ID #{$state['order_id']}.";
+        }
+
+        return 'Dime cómo quieres continuar.';
+    }
+
+    private function isClearlyOutOfScopeQuestion(string $normalized): bool
+    {
+        if (!str_contains($normalized, '?') && !preg_match('/\b(quiero|puedes|dime|hazme|explica|ayudame|cuentame)\b/u', $normalized)) {
+            return false;
+        }
+
+        return $this->matches($normalized, [
+            'clima',
+            'chiste',
+            'poema',
+            'cancion',
+            'receta',
+            'futbol',
+            'pelicula',
+            'musica',
+            'tarea',
+            'matematicas',
+            'programar',
+            'codigo',
+            'amor',
+            'consejo personal',
+            'noticias',
+            'politica',
+            'medicina',
+            'salud',
+            'inversion',
+            'prestamo',
+            'criptomonedas',
+        ]);
+    }
+
     private function createOrder(AiConversation $conversation, array $state, ?User $user): array
     {
         if (!empty($state['order_id'])) {
@@ -512,7 +970,12 @@ class ProcedureFlowService
             'descarga de constancia' => 'CSF-02',
             'consulta de rfc' => 'CSF-02',
             'consultar rfc' => 'CSF-02',
+            'tramitarme mi rfc' => 'CSF-02',
+            'tramitar mi rfc' => 'CSF-02',
+            'tramite de rfc' => 'CSF-02',
+            'sacar rfc' => 'CSF-02',
             'para rfc' => 'CSF-02',
+            'rfc' => 'CSF-02',
             'curp' => 'CURP-01',
             'nss' => 'NSS-02',
             'numero de seguro social' => 'NSS-02',
@@ -703,6 +1166,19 @@ class ProcedureFlowService
         return null;
     }
 
+    private function extractDirectSubjectName(string $prompt): ?string
+    {
+        $candidate = trim($prompt, " \t\n\r\0\x0B.,;:Â¿?Â¡!");
+        $candidate = preg_replace('/^(?:es|soy|se llama|nombre|cliente|persona|interesado)\s+/iu', '', $candidate);
+        $candidate = trim((string) $candidate, " \t\n\r\0\x0B.,;:Â¿?Â¡!");
+
+        if ($candidate === '' || !$this->isValidSubjectName($candidate)) {
+            return null;
+        }
+
+        return mb_convert_case($candidate, MB_CASE_TITLE, 'UTF-8');
+    }
+
     private function isValidSubjectName(string $candidate): bool
     {
         $forbidden = [
@@ -713,6 +1189,10 @@ class ProcedureFlowService
             'nacimiento',
             'solicitud',
             'servicio',
+            'senor',
+            'senora',
+            'sr',
+            'sra',
             'una',
             'un',
         ];
@@ -721,6 +1201,16 @@ class ProcedureFlowService
 
         return count($words) >= 2
             && collect($words)->every(fn (string $word) => !in_array($word, $forbidden, true));
+    }
+
+    private function looksLikeIncompleteSubjectResponse(string $prompt): bool
+    {
+        $candidate = trim($prompt, " \t\n\r\0\x0B.,;:Â¿?Â¡!");
+        $normalized = $this->normalize($candidate);
+
+        return preg_match('/\b(senor|senora|sr|sra)\b/u', $normalized) === 1
+            || (preg_match('/^[A-Za-zÃÃ‰ÃÃ“ÃšÃœÃ‘Ã¡Ã©Ã­Ã³ÃºÃ¼Ã±]+(?:\s+[A-Za-zÃÃ‰ÃÃ“ÃšÃœÃ‘Ã¡Ã©Ã­Ã³ÃºÃ¼Ã±]+){0,3}$/u', $candidate) === 1
+                && !$this->isValidSubjectName($candidate));
     }
 
     private function isGenericGreeting(string $normalized): bool
@@ -738,6 +1228,10 @@ class ProcedureFlowService
             'como me puedes ayudar',
             'que puedes hacer',
             'que sabes hacer',
+            'que tramite puedes hacer para mi',
+            'que tramites puedes hacer para mi',
+            'que tramite me puedes hacer',
+            'que tramites me puedes hacer',
             'que tramites manejas',
             'que servicios tienes',
             'con que me ayudas',
