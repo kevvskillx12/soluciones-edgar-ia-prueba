@@ -404,6 +404,39 @@
         font-size: 14px;
         line-height: 1.65;
     }
+    .gpt-welcome-card {
+        width: min(760px, 100%);
+        margin-top: 2px;
+        padding: 18px 20px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--bg-panel);
+        box-shadow: 0 1px 2px var(--ring-soft);
+        text-align: left;
+    }
+    .gpt-welcome-card strong {
+        display: block;
+        margin-bottom: 10px;
+        color: var(--text-primary);
+        font-size: 14px;
+        font-weight: 700;
+    }
+    .gpt-welcome-card ul {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding-left: 18px;
+        color: var(--text-secondary);
+        font-size: 13px;
+        line-height: 1.55;
+    }
+    .gpt-welcome-card code {
+        padding: 1px 5px;
+        border-radius: 6px;
+        background: var(--bg-elevated-2);
+        color: var(--text-primary);
+        font-size: 12px;
+    }
     .gpt-chips {
         display: flex;
         flex-wrap: wrap;
@@ -897,6 +930,16 @@
                         </div>
                         <h1>¿Qué trámite necesitas gestionar?</h1>
                         <p>Selecciona una opción o escribe lo que necesitas. El asistente te guiará paso a paso.</p>
+                        <div class="gpt-welcome-card" role="note" aria-label="Guia rapida del asistente">
+                            <strong>Hola, soy el asistente de Soluciones Edgar. Puedo ayudarte con:</strong>
+                            <ul>
+                                <li>Crear tramites como CURP, actas, RFC, NSS, constancia fiscal y otros servicios del catalogo.</li>
+                                <li>Capturar datos paso a paso, revisar que falta y confirmar antes de crear la solicitud.</li>
+                                <li>Asignar una solicitud a un usuario existente, por ejemplo: <code>Acta de nacimiento para Kevin Montero asignala a cliente@email.com</code>.</li>
+                                <li>Consultar estado o folio con frases como <code>ya la hiciste?</code>, <code>que datos faltan?</code> o <code>cual fue el ultimo tramite?</code>.</li>
+                                <li>Cancelar o cambiar el flujo con <code>cancela este tramite</code> o <code>quiero cambiar de tramite</code>.</li>
+                            </ul>
+                        </div>
                         <div class="gpt-chips">
                             <button class="gpt-chip" type="button" onclick="useChip(this)" data-prompt="Necesito tramitar una CURP">CURP</button>
                             <button class="gpt-chip" type="button" onclick="useChip(this)" data-prompt="Necesito un acta de nacimiento">Acta de nacimiento</button>
@@ -1086,6 +1129,16 @@
                 </div>
                 <h1>¿Qué trámite necesitas gestionar?</h1>
                 <p>Selecciona una opción o escribe lo que necesitas. El asistente te guiará paso a paso.</p>
+                <div class="gpt-welcome-card" role="note" aria-label="Guia rapida del asistente">
+                    <strong>Hola, soy el asistente de Soluciones Edgar. Puedo ayudarte con:</strong>
+                    <ul>
+                        <li>Crear tramites como CURP, actas, RFC, NSS, constancia fiscal y otros servicios del catalogo.</li>
+                        <li>Capturar datos paso a paso, revisar que falta y confirmar antes de crear la solicitud.</li>
+                        <li>Asignar una solicitud a un usuario existente, por ejemplo: <code>Acta de nacimiento para Kevin Montero asignala a cliente@email.com</code>.</li>
+                        <li>Consultar estado o folio con frases como <code>ya la hiciste?</code>, <code>que datos faltan?</code> o <code>cual fue el ultimo tramite?</code>.</li>
+                        <li>Cancelar o cambiar el flujo con <code>cancela este tramite</code> o <code>quiero cambiar de tramite</code>.</li>
+                    </ul>
+                </div>
                 <div class="gpt-chips">
                     <button class="gpt-chip" type="button" onclick="useChip(this)" data-prompt="Necesito tramitar una CURP">CURP</button>
                     <button class="gpt-chip" type="button" onclick="useChip(this)" data-prompt="Necesito un acta de nacimiento">Acta de nacimiento</button>
