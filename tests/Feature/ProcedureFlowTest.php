@@ -268,6 +268,86 @@ class ProcedureFlowTest extends TestCase
         $this->assertSame(0, $this->fakeRagBridge->invocationCount);
     }
 
+    public function test_admin_can_assign_ai_order_to_existing_user_by_email(): void
+    {
+        $customer = User::factory()->create([
+            'name' => 'Cliente Maestro',
+            'email' => 'cliente.maestro@example.com',
+            'is_admin' => false,
+            'balance' => 0,
+            'email_verified_at' => now(),
+        ]);
+
+        $first = $this->send('Acta de nacimiento para Kevin Montero asignala a cliente.maestro@example.com');
+        $conversationId = $first['conversation_id'];
+
+        $this->assertSame($customer->id, $this->state($conversationId)['assigned_user_id']);
+        $this->assertStringContainsString('Kevin Montero', $first['respuesta']);
+
+        $ready = $this->send('ABCD010203HYNXXX09', $conversationId);
+        $this->assertStringContainsString('cliente.maestro@example.com', $ready['respuesta']);
+
+        $created = $this->send('si hazlo', $conversationId);
+        $state = $this->state($conversationId);
+
+        $this->assertStringContainsString('Asignada a cliente.maestro@example.com', $created['respuesta']);
+        $this->assertDatabaseHas('orders', [
+            'id' => $state['order_id'],
+            'user_id' => $customer->id,
+            'service_id' => $state['service_id'],
+            'status' => 'pending',
+        ]);
+        $this->assertNotSame($this->admin->id, Order::findOrFail($state['order_id'])->user_id);
+    }
+
+    public function test_ai_order_assignment_requires_existing_user_email(): void
+    {
+        $parsed = $this->send('Acta de nacimiento para Kevin Montero asignala a noexiste@example.com');
+
+        $this->assertStringContainsString('No encontré un usuario registrado', $parsed['respuesta']);
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_user_order_resource_only_returns_authenticated_user_orders(): void
+    {
+        $customerA = User::factory()->create(['is_admin' => false, 'email_verified_at' => now()]);
+        $customerB = User::factory()->create(['is_admin' => false, 'email_verified_at' => now()]);
+        $service = Service::where('code', 'ACT-NAC')->firstOrFail();
+
+        $orderA = Order::create([
+            'user_id' => $customerA->id,
+            'service_id' => $service->id,
+            'input_data' => ['subject_name' => 'Cliente A', 'curp' => 'AAAA010101HYNXXX01'],
+            'status' => 'pending',
+            'price_at_purchase' => $service->price,
+        ]);
+        $orderB = Order::create([
+            'user_id' => $customerB->id,
+            'service_id' => $service->id,
+            'input_data' => ['subject_name' => 'Cliente B', 'curp' => 'BBBB010101HYNXXX02'],
+            'status' => 'pending',
+            'price_at_purchase' => $service->price,
+        ]);
+
+        $this->actingAs($customerA);
+
+        $visibleIds = \App\Filament\Dashboard\Resources\OrderResource::getEloquentQuery()
+            ->pluck('id')
+            ->all();
+
+        $this->assertContains($orderA->id, $visibleIds);
+        $this->assertNotContains($orderB->id, $visibleIds);
+
+        $this->actingAs($this->admin);
+
+        $adminIds = \App\Filament\Resources\OrderResource::getEloquentQuery()
+            ->pluck('id')
+            ->all();
+
+        $this->assertContains($orderA->id, $adminIds);
+        $this->assertContains($orderB->id, $adminIds);
+    }
+
     public function test_cancel_ready_flow_does_not_create_order(): void
     {
         $conversationId = $this->startActaFlowReadyToConfirm();

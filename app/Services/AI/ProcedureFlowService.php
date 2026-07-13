@@ -67,6 +67,12 @@ class ProcedureFlowService
             return $this->handled($creationStatusResponse, $state);
         }
 
+        $assignmentResult = $this->applyUserAssignmentFromPrompt($conversation, $state, $prompt, $user);
+        if ($assignmentResult['error'] !== null) {
+            return $this->handled($assignmentResult['error'], $assignmentResult['state']);
+        }
+        $state = $assignmentResult['state'];
+
         if (($state['status'] ?? null) === 'completed' && $this->isConfirmation($normalized)) {
             return $this->handled($this->completedResponse($state), $state);
         }
@@ -421,6 +427,81 @@ class ProcedureFlowService
         }
 
         return 'La solicitud todavía no ha sido creada.';
+    }
+
+    private function applyUserAssignmentFromPrompt(
+        AiConversation $conversation,
+        ?array $state,
+        string $prompt,
+        ?User $currentUser
+    ): array {
+        $email = $this->extractAssignmentEmail($prompt);
+        if ($email === null) {
+            return ['state' => $state, 'error' => null];
+        }
+
+        $state ??= $this->emptyState();
+
+        if (!$currentUser) {
+            return [
+                'state' => $state,
+                'error' => 'Necesito que inicies sesión para asignar la solicitud a un usuario.',
+            ];
+        }
+
+        if (!$currentUser->is_admin && strcasecmp($currentUser->email, $email) !== 0) {
+            return [
+                'state' => $state,
+                'error' => 'Solo un administrador puede asignar solicitudes a otro usuario.',
+            ];
+        }
+
+        $targetUser = User::query()
+            ->whereRaw('LOWER(email) = ?', [mb_strtolower($email, 'UTF-8')])
+            ->first();
+
+        if (!$targetUser) {
+            return [
+                'state' => $state,
+                'error' => "No encontré un usuario registrado con el correo {$email}. "
+                    . 'Créalo primero en Usuarios o indícame otro correo.',
+            ];
+        }
+
+        $state['assigned_user_id'] = $targetUser->id;
+        $state['assigned_user_email'] = $targetUser->email;
+        $state['assigned_user_name'] = $targetUser->name;
+
+        $this->persistState($conversation, $state);
+
+        return ['state' => $state, 'error' => null];
+    }
+
+    private function extractAssignmentEmail(string $prompt): ?string
+    {
+        if (preg_match('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/iu', $prompt, $match) !== 1) {
+            return null;
+        }
+
+        $normalized = $this->normalize($prompt);
+        if (!$this->matches($normalized, [
+            'asigna',
+            'asignala',
+            'asignalo',
+            'ponla',
+            'ponlo',
+            'ponga',
+            'usuario',
+            'cliente',
+            'cuenta',
+            'correo del usuario',
+            'correo del cliente',
+            'para el correo',
+        ])) {
+            return null;
+        }
+
+        return mb_strtolower($match[0], 'UTF-8');
     }
 
     private function answerPreparedQuestion(string $normalized, ?array $state): ?string
@@ -882,6 +963,19 @@ class ProcedureFlowService
             );
         }
 
+        $orderUser = $this->orderUserForState($state, $user);
+        if (!$orderUser) {
+            $state['last_error'] = 'assigned_user_not_found';
+            $this->persistState($conversation, $state);
+
+            return $this->handled(
+                'Ya tengo los datos, pero no encontré el usuario al que se debe asignar la solicitud. '
+                . 'Verifica el correo o créalo primero.',
+                $state,
+                'ERROR'
+            );
+        }
+
         $service = Service::find($state['service_id'] ?? null);
         if (!$service) {
             $state['last_error'] = 'service_not_found';
@@ -894,22 +988,22 @@ class ProcedureFlowService
             );
         }
 
-        if (!$user->is_admin && (float) $user->balance < (float) $service->price) {
+        if (!$user->is_admin && (float) $orderUser->balance < (float) $service->price) {
             $state['last_error'] = 'insufficient_balance';
             $this->persistState($conversation, $state);
 
             return $this->handled(
                 "Ya tengo los datos, pero necesitas saldo suficiente antes de crear la orden. "
-                . "Costo: \${$service->price}. Saldo disponible: \${$user->balance}.",
+                . "Costo: \${$service->price}. Saldo disponible: \${$orderUser->balance}.",
                 $state,
                 'ERROR'
             );
         }
 
         try {
-            $order = DB::transaction(function () use ($user, $service, $state) {
+            $order = DB::transaction(function () use ($orderUser, $user, $service, $state) {
                 return Order::create([
-                    'user_id' => $user->id,
+                    'user_id' => $orderUser->id,
                     'service_id' => $service->id,
                     'input_data' => array_merge(
                         $state['collected_fields'] ?? [],
@@ -917,13 +1011,15 @@ class ProcedureFlowService
                     ),
                     'status' => 'pending',
                     'price_at_purchase' => $service->price,
-                    'admin_notes' => "Solicitud creada desde AI Chat para {$state['subject_name']}.",
+                    'admin_notes' => $this->orderAdminNotes($state, $user, $orderUser),
                 ]);
             });
 
             $state['status'] = 'completed';
             $state['order_id'] = $order->id;
             $state['order_status'] = $order->status;
+            $state['order_user_id'] = $orderUser->id;
+            $state['order_user_email'] = $orderUser->email;
             $state['completed_at'] = now()->toDateTimeString();
             $state['last_error'] = null;
             $this->persistState($conversation, $state, false);
@@ -941,6 +1037,26 @@ class ProcedureFlowService
                 'ERROR'
             );
         }
+    }
+
+    private function orderUserForState(array $state, User $currentUser): ?User
+    {
+        if (!empty($state['assigned_user_id'])) {
+            return User::find($state['assigned_user_id']);
+        }
+
+        return $currentUser;
+    }
+
+    private function orderAdminNotes(array $state, User $actor, User $orderUser): string
+    {
+        $notes = "Solicitud creada desde AI Chat para {$state['subject_name']}.";
+
+        if ($actor->id !== $orderUser->id) {
+            $notes .= " Asignada al usuario {$orderUser->email} por {$actor->email}.";
+        }
+
+        return $notes;
     }
 
     private function availableServices(): Collection
@@ -1102,8 +1218,12 @@ class ProcedureFlowService
             })
             ->implode(', ');
 
+        $assignment = !empty($state['assigned_user_email'])
+            ? " La solicitud quedará asignada a {$state['assigned_user_email']}."
+            : '';
+
         return "Gracias. Tengo los datos necesarios para el trámite {$state['service_name']} de "
-            . "{$state['subject_name']}: {$details}. ¿Deseas continuar con la solicitud?";
+            . "{$state['subject_name']}: {$details}.{$assignment} ¿Deseas continuar con la solicitud?";
     }
 
     private function completedResponse(array $state, bool $justCreated = false): string
@@ -1112,9 +1232,12 @@ class ProcedureFlowService
         $orderId = $state['order_id'];
         $service = $state['service_name'];
         $subject = $state['subject_name'];
+        $assignment = !empty($state['order_user_email'] ?? $state['assigned_user_email'] ?? null)
+            ? ' Asignada a ' . ($state['order_user_email'] ?? $state['assigned_user_email']) . '.'
+            : '';
 
         return "{$prefix} la solicitud #{$orderId} para el trámite {$service} de {$subject}. "
-            . 'Quedó en estado pendiente.';
+            . "Quedó en estado pendiente.{$assignment}";
     }
 
     private function serviceQuestion(Collection $services): string
@@ -1332,6 +1455,11 @@ class ProcedureFlowService
             'status' => 'awaiting_service',
             'order_id' => null,
             'order_status' => null,
+            'assigned_user_id' => null,
+            'assigned_user_email' => null,
+            'assigned_user_name' => null,
+            'order_user_id' => null,
+            'order_user_email' => null,
             'completed_at' => null,
             'last_error' => null,
         ];
@@ -1351,6 +1479,8 @@ class ProcedureFlowService
                 'missing_fields' => $state['missing_fields'],
                 'current_field' => $state['current_field'],
                 'status' => $state['status'],
+                'assigned_user_id' => $state['assigned_user_id'] ?? null,
+                'assigned_user_email' => $state['assigned_user_email'] ?? null,
             ];
         } else {
             unset($metadata['pending_order']);
