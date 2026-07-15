@@ -282,9 +282,12 @@ class ProcedureFlowTest extends TestCase
         $conversationId = $first['conversation_id'];
 
         $this->assertSame($customer->id, $this->state($conversationId)['assigned_user_id']);
+        $this->assertSame('Kevin Montero', $this->state($conversationId)['subject_name']);
         $this->assertStringContainsString('Kevin Montero', $first['respuesta']);
+        $this->assertStringNotContainsString('Asignala', $first['respuesta']);
 
         $ready = $this->send('ABCD010203HYNXXX09', $conversationId);
+        $this->assertStringContainsString('Acta de Nacimiento de Kevin Montero', $ready['respuesta']);
         $this->assertStringContainsString('cliente.maestro@example.com', $ready['respuesta']);
 
         $created = $this->send('si hazlo', $conversationId);
@@ -639,6 +642,26 @@ class ProcedureFlowTest extends TestCase
         $this->assertDatabaseCount('orders', 1);
         $this->assertSame($orderId, $this->state($conversationId)['order_id']);
         $this->assertSame('completed', $this->state($conversationId)['status']);
+    }
+
+    public function test_completed_flow_can_start_another_procedure_without_repeating_previous_order(): void
+    {
+        $conversationId = $this->startActaFlowReadyToConfirm();
+        $this->send('si hazlo', $conversationId);
+        $orderId = $this->state($conversationId)['order_id'];
+
+        $next = $this->send('Quiero crear otro trámite', $conversationId);
+
+        $this->assertStringContainsString('Qué trámite deseas realizar ahora', $next['respuesta']);
+        $this->assertStringNotContainsString("solicitud #{$orderId}", $next['respuesta']);
+        $this->assertSame('awaiting_service', $this->state($conversationId)['status']);
+        $this->assertNull($this->state($conversationId)['subject_name']);
+
+        $again = $this->send('Puedo crear otro?', $conversationId);
+
+        $this->assertStringContainsString('Qué trámite deseas realizar ahora', $again['respuesta']);
+        $this->assertStringNotContainsString("solicitud #{$orderId}", $again['respuesta']);
+        $this->assertDatabaseCount('orders', 1);
     }
 
     /**

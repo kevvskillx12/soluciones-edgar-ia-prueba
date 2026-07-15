@@ -824,10 +824,27 @@
     }
     @media (max-width: 768px) {
         #gpt-shell {
-            min-height: 520px;
-            border-radius: 12px;
+            height: calc(100dvh - 92px) !important;
+            min-height: 0;
+            border-radius: 10px;
         }
-        .gpt-chat-header { padding: 14px 16px; }
+        .gpt-chat-header {
+            padding: 10px 12px;
+            gap: 10px;
+        }
+        .gpt-header-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            font-size: 14px;
+        }
+        .gpt-header-copy h2 {
+            font-size: 14px;
+            max-width: 42vw;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
         .gpt-header-copy p { display: none; }
         .gpt-header-actions { gap: 7px; }
         #gpt-status-text { padding: 6px 9px; min-height: 36px; font-size: 0; width: 32px; justify-content: center; }
@@ -847,20 +864,122 @@
             transition: transform .2s ease;
         }
         #gpt-history.is-open { transform: translateX(0); }
-        .gpt-context-bar { padding: 12px 16px; }
-        #gpt-messages { padding: 18px 14px; }
-        .gpt-message-stack { max-width: calc(100% - 46px); }
-        .gpt-msg { font-size: 13.5px; padding: 11px 13px; }
-        #gpt-input-bar { padding: 12px 13px 14px; }
+        .gpt-context-bar {
+            padding: 9px 12px;
+            min-height: 44px;
+        }
+        .gpt-context-label { font-size: 10px; }
+        #gpt-context-title {
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .gpt-main-row { min-height: 0; }
+        #gpt-messages {
+            padding: 12px 10px 14px;
+            gap: 6px;
+        }
+        .gpt-row { padding: 8px 0; }
+        .gpt-row-inner {
+            gap: 9px;
+            max-width: 100%;
+        }
+        .gpt-message-stack {
+            max-width: calc(100% - 38px);
+            min-width: 0;
+        }
+        .gpt-sender { font-size: 10.5px; }
+        .gpt-msg {
+            font-size: 13.5px;
+            line-height: 1.55;
+            padding: 10px 11px;
+            border-radius: 11px;
+            overflow-wrap: anywhere;
+            word-break: normal;
+        }
+        #gpt-empty {
+            justify-content: flex-start;
+            min-height: auto;
+            padding: 18px 8px 22px;
+            gap: 12px;
+        }
+        .gpt-empty-avatar {
+            width: 44px;
+            height: 44px;
+        }
+        #gpt-empty h1 { font-size: 18px; }
+        #gpt-empty p { font-size: 12.5px; line-height: 1.5; }
+        .gpt-welcome-card {
+            padding: 13px 14px;
+            border-radius: 10px;
+        }
+        .gpt-welcome-card ul {
+            gap: 6px;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+        .gpt-chips {
+            margin-top: 6px;
+            gap: 7px;
+        }
+        .gpt-chip {
+            padding: 8px 10px;
+            font-size: 12px;
+        }
+        #gpt-input-bar {
+            padding: 9px 10px calc(9px + env(safe-area-inset-bottom));
+        }
+        .gpt-input-wrap {
+            gap: 7px;
+            padding: 6px;
+            border-radius: 12px;
+        }
+        #gpt-prompt {
+            min-height: 38px;
+            max-height: 112px;
+            padding: 8px 6px;
+            font-size: 14px;
+            line-height: 1.45;
+        }
         .gpt-footer-note { display: none; }
         .gpt-confirm-grid { grid-template-columns: 1fr; gap: 4px 0; }
         .gpt-summary-suggest-list { grid-template-columns: 1fr 1fr; }
     }
     @media (max-width: 480px) {
-        #gpt-shell { min-height: 500px; border-radius: 10px; }
-        .gpt-avatar { width: 28px; height: 28px; }
-        .gpt-message-stack { max-width: calc(100% - 40px); }
-        #gpt-mic, #gpt-send { width: 36px; height: 36px; flex-basis: 36px; }
+        #gpt-shell {
+            height: calc(100dvh - 82px) !important;
+            border-left: 0;
+            border-right: 0;
+            border-radius: 0;
+        }
+        .gpt-chat-header { padding: 9px 10px; }
+        .gpt-header-copy h2 { max-width: 34vw; }
+        .gpt-icon-btn {
+            width: 34px;
+            height: 34px;
+        }
+        #gpt-new-chat {
+            width: 34px;
+            height: 34px;
+            min-height: 34px;
+        }
+        .gpt-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 9px;
+            font-size: 10px;
+        }
+        .gpt-message-stack { max-width: calc(100% - 34px); }
+        .gpt-msg { font-size: 13px; }
+        #gpt-mic, #gpt-send {
+            width: 38px;
+            height: 38px;
+            flex-basis: 38px;
+        }
+        #gpt-summary {
+            width: min(92vw, 330px);
+        }
     }
 </style>
 @endpush

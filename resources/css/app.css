@@ -2,6 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+    @media (max-width: 640px) {
+        html,
+        body {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+        .fi-main {
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+        }
+
+        .fi-page,
+        .fi-section,
+        .fi-section-content,
+        .fi-fo-component-ctn {
+            min-width: 0;
+        }
+
+        .fi-section {
+            border-radius: 0.875rem !important;
+        }
+
+        .fi-ta,
+        .fi-ta-content,
+        .fi-ta-table,
+        .fi-wi-widget {
+            max-width: 100%;
+        }
+
+        .fi-ta-content {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .fi-ta-table {
+            min-width: 620px;
+        }
+
+        .fi-btn,
+        .fi-input-wrp,
+        .fi-select-input,
+        .fi-ta-search-field {
+            max-width: 100%;
+        }
+
+        .fi-header-heading {
+            font-size: 1.25rem !important;
+            line-height: 1.35 !important;
+        }
+
+        .fi-header-subheading {
+            font-size: 0.875rem !important;
+            line-height: 1.45 !important;
+        }
+    }
+}
+
 @layer utilities {
     .animate-fade-in {
         animation: fadeIn 0.5s ease-out;

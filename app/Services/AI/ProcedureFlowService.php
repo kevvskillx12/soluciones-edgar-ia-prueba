@@ -72,6 +72,7 @@ class ProcedureFlowService
             return $this->handled($assignmentResult['error'], $assignmentResult['state']);
         }
         $state = $assignmentResult['state'];
+        $procedurePrompt = $this->stripAssignmentDirective($prompt);
 
         if (($state['status'] ?? null) === 'completed' && $this->isConfirmation($normalized)) {
             return $this->handled($this->completedResponse($state), $state);
@@ -80,7 +81,7 @@ class ProcedureFlowService
         if (($state['status'] ?? null) === 'ready_to_confirm') {
             if ($this->isCorrection($normalized)) {
                 $correction = $this->fieldExtractor->extract(
-                    $prompt,
+                    $procedurePrompt,
                     null,
                     [],
                     $state,
@@ -137,12 +138,36 @@ class ProcedureFlowService
             'cambiar de tramite',
             'cambia el tramite',
             'quiero otro tramite',
+            'quiero crear otro tramite',
+            'puedo crear otro',
+            'puedo hacer otro',
+            'crear otro tramite',
+            'hacer otro tramite',
+            'tramitar otro',
+            'otra solicitud',
+            'crear otra solicitud',
+            'hacer otra solicitud',
             'nuevo tramite',
             'iniciar otro tramite',
             'empezar otro tramite',
             'vamos con otro tramite',
         ])) {
-            $subjectName = $state['subject_name'] ?? $this->extractSubjectName($prompt);
+            $shouldStartClean = ($state['status'] ?? null) === 'completed'
+                || $this->matches($normalized, [
+                    'quiero crear otro tramite',
+                    'puedo crear otro',
+                    'puedo hacer otro',
+                    'crear otro tramite',
+                    'hacer otro tramite',
+                    'tramitar otro',
+                    'otra solicitud',
+                    'crear otra solicitud',
+                    'hacer otra solicitud',
+                    'nuevo tramite',
+                    'iniciar otro tramite',
+                    'empezar otro tramite',
+                ]);
+            $subjectName = $shouldStartClean ? null : ($state['subject_name'] ?? $this->extractSubjectName($prompt));
             $state = $this->emptyState($subjectName);
             $this->persistState($conversation, $state, false);
 
@@ -164,12 +189,12 @@ class ProcedureFlowService
         }
 
         $services = $this->availableServices();
-        $service = $this->detectService($prompt, $services);
+        $service = $this->detectService($procedurePrompt, $services);
         if (!empty($state['service_id'])
             && in_array($state['status'] ?? null, ['awaiting_subject', 'collecting', 'ready_to_confirm'], true)) {
             $service = null;
         }
-        $subjectName = $this->extractSubjectName($prompt);
+        $subjectName = $this->extractSubjectName($procedurePrompt);
         if (!$subjectName
             && !empty($state['service_id'])
             && ($state['status'] ?? null) === 'awaiting_subject'
@@ -234,7 +259,7 @@ class ProcedureFlowService
         if ($state['current_field']) {
             $current = $this->currentFieldDefinition($state) ?? [];
             $capture = $this->fieldExtractor->extract(
-                $prompt,
+                $procedurePrompt,
                 $state['current_field'],
                 $current,
                 $state,
@@ -502,6 +527,23 @@ class ProcedureFlowService
         }
 
         return mb_strtolower($match[0], 'UTF-8');
+    }
+
+    private function stripAssignmentDirective(string $prompt): string
+    {
+        $email = $this->extractAssignmentEmail($prompt);
+        if ($email === null) {
+            return $prompt;
+        }
+
+        $escapedEmail = preg_quote($email, '/');
+        $clean = preg_replace(
+            '/\s*\b(?:asign(?:a|ala|alo|ar)|pon(?:la|lo)?|ponga|para\s+(?:el\s+)?(?:usuario|cliente|correo|cuenta)|al\s+(?:usuario|cliente)|usuario|cliente)\s+(?:a\s+)?' . $escapedEmail . '\b/iu',
+            '',
+            $prompt
+        );
+
+        return trim((string) $clean, " \t\n\r\0\x0B.,;:¿?¡!");
     }
 
     private function answerPreparedQuestion(string $normalized, ?array $state): ?string
