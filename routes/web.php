@@ -245,6 +245,8 @@ Route::post('/ia-test', function () {
         }
 
         $memoryService->addUserMessage($conversation, $pregunta);
+        $routerDecision = app(\App\Services\AI\AgentRouterService::class)
+            ->route($conversation, $pregunta, $conversationHistory);
         $procedureFlowResult = app(\App\Services\AI\ProcedureFlowService::class)
             ->handle($conversation, $pregunta, $user);
         $procedureFlowResponse = $procedureFlowResult['handled']
@@ -461,6 +463,7 @@ Route::post('/ia-test', function () {
                 $pregunta, $preguntaConContexto, $observability, $startTime,
                 $generateSimpleResponse, $conversationHistory, $procedureFlowResponse,
                 $procedureFlowToolStatus, $procedureFlowOrderId
+                , $routerDecision
             ) {
                 $fullResponse          = '';
                 $ttftRecorded          = false;
@@ -477,6 +480,14 @@ Route::post('/ia-test', function () {
                 echo "data: " . json_encode([
                     'type'            => 'conversation',
                     'conversation_id' => $conversation->conversation_id,
+                ]) . "\n\n";
+                $flushStream();
+
+                echo "data: " . json_encode([
+                    'type' => 'status',
+                    'status' => 'ROUTING',
+                    'agent' => $routerDecision['agent'],
+                    'intent' => $routerDecision['intent'],
                 ]) . "\n\n";
                 $flushStream();
 
@@ -572,6 +583,10 @@ Route::post('/ia-test', function () {
                         ? $procedureFlowToolStatus
                         : ($success || $businessResponse ? 'SUCCESS' : 'ERROR'),
                     'duration_ms' => $totalLatencyMs,
+                    'router'      => $routerDecision,
+                    'agent'       => $businessSource === 'procedure_flow'
+                        ? 'transactional_agent'
+                        : ($success ? 'rag_agent' : ($businessResponse ? $businessSource : 'rag_agent')),
                 ];
                 if ($procedureFlowOrderId) {
                     $toolDetails['order_id'] = $procedureFlowOrderId;

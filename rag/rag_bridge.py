@@ -20,7 +20,9 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/api/generate")
 MODELO = "llama3.2:1b"
 
 # Recupera más fragmentos para darle más contexto al modelo.
-TOP_K = 12
+TOP_K = 10
+TOP_RERANKED = 3
+KEYWORD_POOL = 25
 
 
 def normalizar_texto(texto):
@@ -35,6 +37,120 @@ def normalizar_texto(texto):
         .replace("ñ", "n")
         .strip()
     )
+
+
+def tokenizar(texto):
+    texto = normalizar_texto(texto)
+    return re.findall(r"[a-z0-9]{3,}", texto)
+
+
+def keyword_score(query_tokens, documento):
+    doc_tokens = tokenizar(documento)
+    if not query_tokens or not doc_tokens:
+        return 0.0
+
+    doc_set = set(doc_tokens)
+    overlap = sum(1 for token in query_tokens if token in doc_set)
+    phrase_bonus = 0.0
+    doc_normalizado = normalizar_texto(documento)
+
+    for token in query_tokens:
+        if token in doc_normalizado:
+            phrase_bonus += 0.05
+
+    length_penalty = 1.0 + (len(doc_tokens) / 600.0)
+    return (overlap + phrase_bonus) / length_penalty
+
+
+def keyword_search(coleccion, pregunta, limite=KEYWORD_POOL):
+    try:
+        datos = coleccion.get(include=["documents"])
+    except Exception:
+        return []
+
+    documentos = datos.get("documents") or []
+    ids = datos.get("ids") or [f"kw-{i}" for i in range(len(documentos))]
+    query_tokens = tokenizar(pregunta)
+    scored = []
+
+    for idx, documento in enumerate(documentos):
+        if not documento:
+            continue
+        score = keyword_score(query_tokens, documento)
+        if score > 0:
+            scored.append({
+                "id": ids[idx] if idx < len(ids) else f"kw-{idx}",
+                "document": documento,
+                "score": score,
+                "source": "keyword",
+            })
+
+    scored.sort(key=lambda item: item["score"], reverse=True)
+    return scored[:limite]
+
+
+def semantic_search(coleccion, pregunta, limite=TOP_K):
+    res = coleccion.query(
+        query_texts=[pregunta],
+        n_results=limite
+    )
+
+    documentos = res.get("documents", [[]])[0]
+    ids = res.get("ids", [[]])[0] if res.get("ids") else []
+    distances = res.get("distances", [[]])[0] if res.get("distances") else []
+    resultados = []
+
+    for idx, documento in enumerate(documentos):
+        if not documento:
+            continue
+        distance = distances[idx] if idx < len(distances) else 1.0
+        resultados.append({
+            "id": ids[idx] if idx < len(ids) else f"vec-{idx}",
+            "document": documento,
+            "score": 1.0 / (1.0 + float(distance or 0.0)),
+            "source": "semantic",
+        })
+
+    return resultados
+
+
+def reciprocal_rank_fusion(result_sets, k=60):
+    fused = {}
+
+    for resultados in result_sets:
+        for rank, item in enumerate(resultados, start=1):
+            item_id = item["id"]
+            if item_id not in fused:
+                fused[item_id] = {
+                    "id": item_id,
+                    "document": item["document"],
+                    "score": 0.0,
+                    "sources": set(),
+                }
+            fused[item_id]["score"] += 1.0 / (k + rank)
+            fused[item_id]["sources"].add(item.get("source", "unknown"))
+
+    ordenados = list(fused.values())
+    ordenados.sort(key=lambda item: item["score"], reverse=True)
+    return ordenados
+
+
+def rerank_local(pregunta, candidatos, limite=TOP_RERANKED):
+    query_tokens = tokenizar(pregunta)
+    pregunta_normalizada = normalizar_texto(pregunta)
+    reranked = []
+
+    for item in candidatos:
+        documento = item["document"]
+        score_textual = keyword_score(query_tokens, documento)
+        documento_normalizado = normalizar_texto(documento)
+        phrase_score = 0.25 if pregunta_normalizada and pregunta_normalizada in documento_normalizado else 0.0
+        source_bonus = 0.08 if len(item.get("sources", [])) > 1 else 0.0
+        final_score = item["score"] + score_textual + phrase_score + source_bonus
+        reranked.append({**item, "rerank_score": final_score})
+
+    reranked.sort(key=lambda item: item["rerank_score"], reverse=True)
+    return reranked[:limite]
 
 
 def respuesta_capacidades(pregunta):
@@ -222,14 +338,15 @@ def buscar_contexto(pregunta):
 
     pregunta_busqueda = pregunta + extra
 
-    res = coleccion.query(
-        query_texts=[pregunta_busqueda],
-        n_results=TOP_K
-    )
+    semanticos = semantic_search(coleccion, pregunta_busqueda, TOP_K)
+    textuales = keyword_search(coleccion, pregunta_busqueda, KEYWORD_POOL)
+    fusionados = reciprocal_rank_fusion([semanticos, textuales])
+    rerankeados = rerank_local(pregunta_busqueda, fusionados[: max(TOP_K, KEYWORD_POOL)])
 
-    documentos = res.get("documents", [[]])[0]
+    if rerankeados:
+        return [item["document"] for item in rerankeados]
 
-    return documentos
+    return [item["document"] for item in semanticos[:TOP_RERANKED]]
 
 
 def respuesta_directa_si_aplica(pregunta):
@@ -526,7 +643,12 @@ def main():
         fragmentos = buscar_contexto(pregunta_actual)
         
         # Emite un evento especial de SEARCHING/CONTEXT_FOUND (Fase 3 UI states)
-        print(json.dumps({"status": "SEARCHING", "context_found": len(fragmentos) > 0}), flush=True)
+        print(json.dumps({
+            "status": "SEARCHING",
+            "context_found": len(fragmentos) > 0,
+            "rag_pipeline": "hybrid_rrf_rerank",
+            "top_k_final": len(fragmentos)
+        }), flush=True)
 
         if not consultar_ollama(pregunta, fragmentos):
             sys.exit(1)
