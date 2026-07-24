@@ -569,7 +569,7 @@ class ProcedureFlowService
             'que sigue',
             'pasos para usar',
             'explicame el proceso',
-        ])) {
+        ]) && !$this->matches($normalized, ['saldo', 'balance', 'usuario'])) {
             if ($state && !empty($state['service_name'])) {
                 return "Estamos con {$state['service_name']}. " . $this->nextStepHint($state);
             }
@@ -705,6 +705,29 @@ class ProcedureFlowService
         }
 
         if ($this->matches($normalized, [
+            'guia admin',
+            'guia del admin',
+            'que puede hacer el admin',
+            'como modifica el admin',
+            'como elimino',
+            'puedes eliminar',
+            'puedes modificar',
+            'editar solicitud',
+            'modificar solicitud',
+            'eliminar solicitud',
+            'rechazar solicitud',
+            'completar solicitud',
+            'panel de tramites',
+        ])) {
+            return 'Guia rapida para admin: desde el chat puedo crear solicitudes nuevas, capturar datos, asignarlas a un usuario por correo, '
+                . 'consultar el ultimo tramite, decir que datos faltan, cancelar un flujo antes de crear la orden o cambiar de tramite. '
+                . 'Para modificar, completar, rechazar o eliminar una solicitud ya creada, usa el panel de Tramites/Ordenes de Filament; '
+                . 'por seguridad la IA no borra ni edita registros finales directamente. '
+                . 'Frases utiles: "Acta de nacimiento para Kevin Montero asignala a cliente@email.com", "que datos faltan?", '
+                . '"si, hazlo", "cancela este tramite" o "quiero cambiar de tramite".';
+        }
+
+        if ($this->matches($normalized, [
             'no puedo entrar',
             'no me deja entrar',
             'no llega el correo',
@@ -731,6 +754,168 @@ class ProcedureFlowService
         ])) {
             return 'Si algo falla, intenta actualizar la página y enviar el mensaje otra vez. '
                 . 'Si ya había un trámite en curso, puedo retomarlo con esta conversación usando el folio o el último estado guardado.';
+        }
+
+        if ($this->matches($normalized, [
+            'si',
+            'si hazlo',
+            'hazlo',
+            'continua',
+            'continuar',
+            'termina',
+            'termina la solicitud',
+            'creala',
+            'crealo',
+        ]) && (!$state || empty($state['service_name']))) {
+            return 'Todavia no tengo una solicitud lista para crear. Primero dime el tramite y la persona. '
+                . 'Ejemplos: "CURP para Kevin Montero" o "Acta de nacimiento para Luis Ek".';
+        }
+
+        if ($this->matches($normalized, [
+            'folio',
+            'id de solicitud',
+            'numero de solicitud',
+            'ya la hiciste',
+            'ya lo hiciste',
+            'se creo',
+            'esta creada',
+        ]) && (!$state || empty($state['order_id']))) {
+            return 'Todavia no hay una solicitud creada en esta conversacion. '
+                . 'Cuando tenga tramite, persona y datos requeridos, escribe "si, hazlo" para crearla.';
+        }
+
+        if ($this->matches($normalized, [
+            'crear usuario',
+            'registrar usuario',
+            'nuevo usuario',
+            'dar de alta usuario',
+            'asignar usuario',
+            'correo de usuario',
+            'usuario no existe',
+        ])) {
+            return 'Puedo asignar una solicitud a un usuario existente si me das su correo. '
+                . 'Ejemplo: "Acta de nacimiento para Kevin Montero asignala a cliente@email.com". '
+                . 'Si el usuario no existe, primero crealo desde el panel de Usuarios.';
+        }
+
+        if ($this->matches($normalized, [
+            'subir archivo',
+            'subir documento',
+            'adjuntar archivo',
+            'adjuntar documento',
+            'pdf',
+            'comprobante',
+            'resultado del tramite',
+        ])) {
+            return 'El chat puede guiar la captura y crear la solicitud. '
+                . 'Para subir resultados, comprobantes o documentos finales usa el panel correspondiente de Filament, '
+                . 'por ejemplo Tramites/Ordenes o Solicitudes de saldo.';
+        }
+
+        if ($this->matches($normalized, [
+            'microfono',
+            'mic',
+            'voz',
+            'no escucha',
+            'no aparece el microfono',
+            'no puedo dictar',
+        ])) {
+            return 'El microfono depende del navegador. En Chrome/Edge debes permitir permisos de microfono y usar HTTPS o localhost. '
+                . 'Si no funciona, escribe el mensaje manualmente; el flujo del tramite no se pierde.';
+        }
+
+        if ($this->matches($normalized, [
+            'celular',
+            'movil',
+            'telefono',
+            'pantalla chica',
+            'responsive',
+            'se ve mal',
+            'no cabe',
+        ])) {
+            return 'En movil puedes usar el mismo chat. Si algo no cabe, gira el telefono o actualiza la pagina. '
+                . 'El input, microfono, nuevo chat y envio deben seguir disponibles.';
+        }
+
+        if ($this->matches($normalized, [
+            'cuantas personas',
+            'muchos usuarios',
+            'varios usuarios',
+            '10 personas',
+            'diez personas',
+            'concurrencia',
+            'al mismo tiempo',
+        ])) {
+            return 'El sistema separa conversaciones por conversation_id, asi que varias personas pueden usar el chat sin mezclar memoria. '
+                . 'El rendimiento real depende de Docker, SQLite, Ollama y la capacidad de la computadora.';
+        }
+
+        if ($state && !empty($state['service_name']) && $this->matches($normalized, [
+            'no entiendo',
+            'me confundi',
+            'estoy confundido',
+            'que sigue',
+            'que hago ahora',
+            'explicalo mejor',
+        ])) {
+            return "No te preocupes. Estamos con {$state['service_name']}. " . $this->nextStepHint($state);
+        }
+
+        if ($this->matches($normalized, [
+            'cuentame un chiste',
+            'dime un chiste',
+            'hazme reir',
+        ])) {
+            return 'Puedo intentarlo: ¿por qué el trámite fue al gimnasio? Porque quería estar en forma. '
+                . 'Ya en serio, puedo ayudarte con trámites y solicitudes. Opciones: "CURP para Kevin Montero", '
+                . '"que datos faltan?" o "guia admin".';
+        }
+
+        if ($this->matches($normalized, [
+            'no se',
+            'no se que poner',
+            'que pongo',
+            'que escribo',
+            'no entiendo',
+            'estoy perdido',
+            'ayudame',
+            'hazlo tu',
+            'lo que sea',
+            'cualquier cosa',
+            'prueba',
+            'test',
+            'asdf',
+            'jaja',
+            'xd',
+            'ok',
+            'va',
+            'sale',
+            'gracias',
+            'eres real',
+            'me escuchas',
+            'estas ahi',
+            'que onda',
+            'quien te hizo',
+            'cuentame un chiste',
+            'te amo',
+            'eres tonto',
+            'no sirves',
+            'quiero comida',
+            'quiero jugar',
+            'dame dinero',
+            'haz mi tarea',
+            'busca en google',
+            'abre whatsapp',
+            'llama a alguien',
+        ])) {
+            return 'Estoy aqui para ayudarte con tramites de Soluciones Edgar. '
+                . 'Si no sabes que escribir, usa una de estas opciones: '
+                . '1) "CURP para Kevin Montero". '
+                . '2) "Acta de nacimiento para Kevin Montero". '
+                . '3) "Que servicios manejas?". '
+                . '4) "Que datos faltan?". '
+                . '5) "guia admin". '
+                . 'Si tu pregunta no es de tramites, puedo orientarte de forma general, pero no hago acciones fuera del sistema.';
         }
 
         if ($this->matches($normalized, [

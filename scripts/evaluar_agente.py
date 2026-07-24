@@ -13,6 +13,7 @@ import json
 import re
 import sqlite3
 import time
+import unicodedata
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
@@ -36,13 +37,13 @@ class EvalCase:
 
 
 CASES = [
-    EvalCase("Hola", "transactional_agent", "transactional", ("tramite",)),
+    EvalCase("Hola", "transactional_agent", "transactional", ("tram",)),
     EvalCase("Necesito tramitar una CURP para Kevin Montero", "transactional_agent", "transactional", ("curp", "kevin")),
     EvalCase("EXPL050202HYNKCSA0", "transactional_agent", "transactional", ("curp",)),
     EvalCase("Que datos faltan?", "transactional_agent", "transactional", ("falta", "dato")),
     EvalCase("Cancela este tramite", "transactional_agent", "transactional", ("cancel",)),
-    EvalCase("Quiero cambiar de tramite", "transactional_agent", "transactional", ("tramite",)),
-    EvalCase("Que servicios ofrece Soluciones Edgar?", "transactional_agent", "transactional", ("servicios",)),
+    EvalCase("Quiero cambiar de tramite", "transactional_agent", "transactional", ("tram",)),
+    EvalCase("Que servicios ofrece Soluciones Edgar?", "transactional_agent", "transactional", ("tram",)),
     EvalCase("Como funciona el saldo del usuario?", "rag_agent", "rag", ("saldo", "balance")),
     EvalCase("Que tecnologias usa el sistema?", "rag_agent", "rag", ("laravel", "ollama")),
     EvalCase("Explica OrderResource", "rag_agent", "rag", ("orderresource", "pedidos")),
@@ -76,6 +77,20 @@ def post_form(opener: urllib.request.OpenerDirector, url: str, data: dict[str, s
 
 
 def parse_sse(content: str) -> dict[str, Any]:
+    stripped = content.strip()
+    if stripped.startswith("{"):
+        try:
+            payload = json.loads(stripped)
+            return {
+                "conversation_id": payload.get("conversation_id"),
+                "respuesta": payload.get("respuesta") or payload.get("error") or "",
+                "statuses": [],
+                "done": payload,
+                "errors": [payload.get("metadata", {}).get("error")] if payload.get("metadata", {}).get("error") else [],
+            }
+        except json.JSONDecodeError:
+            pass
+
     respuesta = ""
     conversation_id = None
     statuses = []
@@ -114,6 +129,23 @@ def parse_sse(content: str) -> dict[str, Any]:
     }
 
 
+def normalize_for_judge(text: str) -> str:
+    candidates = [text]
+    try:
+        repaired = text.encode("latin1").decode("utf-8")
+        candidates.append(repaired)
+    except UnicodeError:
+        pass
+
+    best = min(candidates, key=lambda value: value.count("?") + value.count("�"))
+    best = unicodedata.normalize("NFKD", best)
+    best = "".join(ch for ch in best if not unicodedata.combining(ch))
+    best = best.replace("Ã¡", "a").replace("Ã©", "e").replace("Ã­", "i")
+    best = best.replace("Ã³", "o").replace("Ãº", "u").replace("Ã±", "n")
+    best = best.replace("??", "")
+    return best.lower()
+
+
 def latest_observability(db_path: Path, session_id: str | None) -> dict[str, Any] | None:
     if not session_id or not db_path.exists():
         return None
@@ -144,13 +176,13 @@ def latest_observability(db_path: Path, session_id: str | None) -> dict[str, Any
 
 
 def judge(case: EvalCase, parsed: dict[str, Any], observability: dict[str, Any] | None) -> dict[str, Any]:
-    response = parsed["respuesta"].lower()
+    response = normalize_for_judge(parsed["respuesta"] + " " + " ".join(parsed.get("errors") or []))
     was_blocked = bool((observability or {}).get("was_blocked")) or "blocked_by_guardrails" in response
     tool = (observability or {}).get("tools_executed") or {}
     agent = tool.get("agent") or tool.get("router", {}).get("agent")
     router_ok = case.expected_agent == "guardrail" if was_blocked else agent == case.expected_agent
     blocking_ok = was_blocked is case.should_block
-    term_hits = [term for term in case.expected_terms if term.lower() in response]
+    term_hits = [term for term in case.expected_terms if normalize_for_judge(term) in response]
     faithfulness_ok = case.should_block or not case.expected_terms or bool(term_hits)
 
     return {

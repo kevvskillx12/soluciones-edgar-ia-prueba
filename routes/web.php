@@ -554,7 +554,10 @@ Route::post('/ia-test', function () {
                         $ttftRecorded = true;
                     }
 
-                    $fullResponse = 'No fue posible conectar con el servicio local de IA. Verifica Python y Ollama e intenta de nuevo.';
+                    $fullResponse = 'No fue posible conectar con el servicio local de IA. Verifica Python y Ollama e intenta de nuevo. '
+                        . 'Mientras tanto puedes continuar con opciones del flujo: "CURP para Kevin Montero", '
+                        . '"Acta de nacimiento para Kevin Montero", "¿Qué datos faltan?", '
+                        . '"cancela este trámite" o "quiero cambiar de trámite".';
                     $tokenCount   = max(1, (int) ceil(strlen($fullResponse) / 4));
 
                     echo "data: " . json_encode(['type' => 'error', 'error' => $fullResponse]) . "\n\n";

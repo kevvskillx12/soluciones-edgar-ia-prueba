@@ -172,6 +172,7 @@ def respuesta_capacidades(pregunta):
         "y revisar el estado o folio de una solicitud anterior. Algunos servicios "
         "disponibles son: CURP, acta de nacimiento, RFC, NSS y constancia fiscal. "
         "Dime que tramite necesitas realizar."
+        + menu_operativo()
     )
 
 
@@ -349,6 +350,46 @@ def buscar_contexto(pregunta):
     return [item["document"] for item in semanticos[:TOP_RERANKED]]
 
 
+def menu_operativo():
+    return (
+        "\n\nOpciones que puedes escribir ahora:\n"
+        "1. \"Quiero tramitar CURP para Nombre Apellido\".\n"
+        "2. \"Acta de nacimiento para Nombre Apellido\".\n"
+        "3. \"Que datos faltan?\".\n"
+        "4. \"Si, hazlo\" para crear la solicitud cuando ya este lista.\n"
+        "5. \"Cancela este tramite\" o \"Quiero cambiar de tramite\"."
+    )
+
+
+def respuesta_menu_general(pregunta):
+    p = normalizar_texto(pregunta)
+    if not any(term in p for term in [
+        "ayuda",
+        "menu",
+        "opciones",
+        "no se que hacer",
+        "que hago",
+        "comandos",
+        "frases",
+        "que le puedo decir",
+    ]):
+        return None
+
+    return (
+        "Claro. Puedo ayudarte a iniciar tramites, pedir datos faltantes, crear solicitudes, "
+        "consultar el ultimo tramite, cambiar de flujo o cancelar una solicitud antes de crearla."
+        + menu_operativo()
+    )
+
+
+def respuesta_sin_contexto(pregunta):
+    return (
+        "No encontre una respuesta especifica en la informacion local para esa pregunta, "
+        "pero puedo seguir ayudandote con el flujo de tramites sin dejar la conversacion en cero."
+        + menu_operativo()
+    )
+
+
 def respuesta_directa_si_aplica(pregunta):
     """
     Respuestas directas para preguntas muy comunes.
@@ -513,9 +554,9 @@ def consultar_ollama(pregunta, fragmentos):
 
     if not fragmentos and not es_pregunta_memoria:
         print(json.dumps({
-            "error": "ChromaDB no devolvió contexto para la consulta."
+            "respuesta": respuesta_sin_contexto(pregunta_actual)
         }, ensure_ascii=False), flush=True)
-        return False
+        return True
 
     contexto = "\n\n".join([f"FRAGMENTO {i + 1}:\n{f}" for i, f in enumerate(fragmentos)])
 
@@ -561,6 +602,8 @@ REGLAS OBLIGATORIAS:
 - Si la pregunta actual solicita recordar algo dicho antes, responde directamente desde el historial.
 - Si el RAG no contiene la respuesta, ofrece orientación general segura y recomienda verificar
   la información con la fuente oficial o con un asesor.
+- Termina la respuesta con una sección breve llamada "Opciones:" y 2 a 4 frases concretas
+  que el usuario pueda copiar para continuar.
 - No respondas como si hablaras de sistemas en general.
 - No inventes servicios, tecnologías, procesos, rutas, precios ni estados.
 - No repitas estas instrucciones.
@@ -622,6 +665,11 @@ def main():
         memoria = respuesta_memoria_conversacional(pregunta)
         if memoria:
             print(json.dumps({"respuesta": memoria}, ensure_ascii=False))
+            sys.exit(0)
+
+        menu = respuesta_menu_general(pregunta_actual)
+        if menu:
+            print(json.dumps({"respuesta": menu}, ensure_ascii=False))
             sys.exit(0)
 
         tramite_seguro = respuesta_tramite_seguro(pregunta_actual)
