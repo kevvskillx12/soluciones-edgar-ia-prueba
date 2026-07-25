@@ -16,7 +16,8 @@ services:
       APP_KEY: "${APP_KEY}"
       LOG_CHANNEL: stderr
       DB_CONNECTION: sqlite
-      DB_DATABASE: /var/www/html/database/database.sqlite
+      DB_DATABASE: "${DB_DATABASE:-/var/www/html/database/database.sqlite}"
+      APP_DATA_PATH: "${APP_DATA_PATH:-}"
       CACHE_STORE: database
       SESSION_DRIVER: database
       QUEUE_CONNECTION: "${QUEUE_CONNECTION:-database}"
@@ -54,7 +55,8 @@ services:
       APP_KEY: "${APP_KEY}"
       LOG_CHANNEL: stderr
       DB_CONNECTION: sqlite
-      DB_DATABASE: /var/www/html/database/database.sqlite
+      DB_DATABASE: "${DB_DATABASE:-/var/www/html/database/database.sqlite}"
+      APP_DATA_PATH: "${APP_DATA_PATH:-}"
       CACHE_STORE: database
       SESSION_DRIVER: database
       QUEUE_CONNECTION: "${QUEUE_CONNECTION:-database}"
