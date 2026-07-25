@@ -68,4 +68,4 @@ ENV APP_ENV=production \
 EXPOSE 8000
 
 ENTRYPOINT ["soluciones-edgar-entrypoint"]
-CMD ["sh", "-lc", "php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
+CMD ["sh", "-lc", "APP_PORT=${PORT:-8000}; case \"$APP_PORT\" in ''|*[!0-9]*) APP_PORT=8000;; esac; php artisan serve --host=0.0.0.0 --port=$APP_PORT"]
