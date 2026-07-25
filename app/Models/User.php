@@ -32,7 +32,7 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmail
      */
     public function sendPasswordResetNotification($token)
     {
-        $this->notify(new \App\Notifications\ResetPasswordNotification($token));
+        $this->notify(new \Illuminate\Auth\Notifications\ResetPassword($token));
     }
     /**
      * The attributes that are mass assignable.

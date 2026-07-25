@@ -9,7 +9,15 @@ Route::get('/', function () {
         return auth()->user()->is_admin ? redirect('/admin') : redirect('/app');
     }
 
-    return redirect('/app/login');
+    return response(
+        '<!doctype html><html lang="es"><head><meta charset="utf-8">'
+        . '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        . '<meta http-equiv="refresh" content="0;url=/app/login">'
+        . '<title>Soluciones Edgar</title></head><body>'
+        . '<p>Redirigiendo al inicio de sesi&oacute;n...</p>'
+        . '<p><a href="/app/login">Ir al inicio de sesi&oacute;n</a></p>'
+        . '</body></html>'
+    );
 });
 
 Route::get('/login', function () {

@@ -136,7 +136,21 @@ class AgentRouterService
     private function matches(string $normalized, array $phrases): bool
     {
         foreach ($phrases as $phrase) {
-            if (str_contains($normalized, $this->normalize($phrase))) {
+            $needle = $this->normalize($phrase);
+
+            if ($needle === '') {
+                continue;
+            }
+
+            if (mb_strlen($needle, 'UTF-8') <= 3) {
+                if (preg_match('/(?<![\pL\pN])' . preg_quote($needle, '/') . '(?![\pL\pN])/u', $normalized) === 1) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (str_contains($normalized, $needle)) {
                 return true;
             }
         }

@@ -827,12 +827,11 @@ class ProcedureFlowService
         if ($this->matches($normalized, [
             'celular',
             'movil',
-            'telefono',
             'pantalla chica',
             'responsive',
             'se ve mal',
             'no cabe',
-        ])) {
+        ]) && !$this->hasActiveProcedureState($state)) {
             return 'En movil puedes usar el mismo chat. Si algo no cabe, gira el telefono o actualiza la pagina. '
                 . 'El input, microfono, nuevo chat y envio deben seguir disponibles.';
         }
@@ -907,7 +906,7 @@ class ProcedureFlowService
             'busca en google',
             'abre whatsapp',
             'llama a alguien',
-        ])) {
+        ]) && !$this->hasActiveProcedureState($state)) {
             return 'Estoy aqui para ayudarte con tramites de Soluciones Edgar. '
                 . 'Si no sabes que escribir, usa una de estas opciones: '
                 . '1) "CURP para Kevin Montero". '
@@ -1653,6 +1652,16 @@ class ProcedureFlowService
         ]);
     }
 
+    private function hasActiveProcedureState(?array $state): bool
+    {
+        return $state !== null && in_array($state['status'] ?? null, [
+            'awaiting_service',
+            'awaiting_subject',
+            'collecting',
+            'ready_to_confirm',
+        ], true);
+    }
+
     private function mentionsKnownService(string $normalized): bool
     {
         return $this->matches($normalized, [
@@ -1724,7 +1733,21 @@ class ProcedureFlowService
     private function matches(string $normalized, array $phrases): bool
     {
         foreach ($phrases as $phrase) {
-            if (str_contains($normalized, $this->normalize($phrase))) {
+            $needle = $this->normalize($phrase);
+
+            if ($needle === '') {
+                continue;
+            }
+
+            if (mb_strlen($needle, 'UTF-8') <= 3) {
+                if (preg_match('/(?<![\pL\pN])' . preg_quote($needle, '/') . '(?![\pL\pN])/u', $normalized) === 1) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (str_contains($normalized, $needle)) {
                 return true;
             }
         }
