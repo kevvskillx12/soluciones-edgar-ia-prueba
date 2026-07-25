@@ -2,10 +2,10 @@
 """
 Seeder de estrés para Semana 07.
 
-Puebla SQLite con registros ficticios realistas usando transacciones por lote.
+Puebla SQLite con registros sintéticos realistas usando transacciones por lote.
 Uso:
+  python scripts/seed_stress_data.py --records 1000
   python scripts/seed_stress_data.py --records 10000
-  python scripts/seed_stress_data.py --records 50000
 """
 
 from __future__ import annotations
@@ -30,12 +30,65 @@ SERVICES = [
     "Localizar NSS con CURP",
     "Constancia fiscal",
     "Antecedentes no Penales",
+    "Acta de Matrimonio",
+    "Acta de Defunción",
+    "Acta de Divorcio",
 ]
 
 STATUSES = ["pending", "processing", "completed", "rejected"]
-NAMES = ["Kevin", "Luis", "Alejandra", "María", "Carlos", "Ana", "Edgar", "Sofía"]
-LASTNAMES = ["Montero", "Ek", "Hernández", "García", "López", "Pérez", "Ramírez", "Cruz"]
+NAMES = [
+    "Kevin",
+    "Luis",
+    "Alejandra",
+    "María",
+    "Carlos",
+    "Ana",
+    "Edgar",
+    "Sofía",
+    "Jorge",
+    "Fernanda",
+    "Miguel",
+    "Valeria",
+    "Daniel",
+    "Gabriela",
+    "Ricardo",
+    "Paola",
+    "José",
+    "Diana",
+    "Manuel",
+    "Karla",
+]
+LASTNAMES = [
+    "Montero",
+    "Ek",
+    "Hernández",
+    "García",
+    "López",
+    "Pérez",
+    "Ramírez",
+    "Cruz",
+    "Martínez",
+    "Gómez",
+    "Sánchez",
+    "Flores",
+    "Vázquez",
+    "Castillo",
+    "Morales",
+    "Jiménez",
+    "Reyes",
+    "Aguilar",
+]
 STATES = ["YN", "DF", "MC", "JC", "NL", "PL", "QR", "BC"]
+EMAIL_DOMAINS = ["gmail.com", "hotmail.com", "outlook.com", "yahoo.com", "icloud.com"]
+NOTE_TEMPLATES = [
+    "Solicitud recibida por el centro de atención. Pendiente de revisión documental.",
+    "Cliente solicita seguimiento del trámite por WhatsApp.",
+    "Documentación registrada para validación interna.",
+    "Información capturada desde atención digital.",
+    "Solicitud programada para revisión del área operativa.",
+    "Registro asociado al catálogo de servicios vigente.",
+    "Expediente en seguimiento por mesa de atención.",
+]
 
 
 def fake_curp(index: int) -> str:
@@ -46,6 +99,23 @@ def fake_curp(index: int) -> str:
     cons = "".join(random.choice(string.ascii_uppercase) for _ in range(3))
     suffix = f"{index % 100:02d}"
     return f"{letters}{date}{sex}{state}{cons}{suffix}"
+
+
+def normalize_email_text(value: str) -> str:
+    replacements = str.maketrans("áéíóúÁÉÍÓÚñÑ", "aeiouAEIOUnN")
+    return value.translate(replacements).lower()
+
+
+def customer_email(first: str, last: str, second_last: str, index: int) -> str:
+    variants = [
+        f"{first}.{last}",
+        f"{first}{last}{index % 97}",
+        f"{first[0]}{last}{second_last[0]}{index % 53}",
+        f"{first}_{last}{index % 31}",
+    ]
+    local_part = normalize_email_text(random.choice(variants))
+    domain = random.choice(EMAIL_DOMAINS)
+    return f"{local_part}@{domain}"
 
 
 def ensure_schema(conn: sqlite3.Connection) -> None:
@@ -84,13 +154,26 @@ def build_rows(start: int, count: int) -> list[tuple[str, str, str, str, str, st
         service = random.choice(SERVICES)
         status = random.choice(STATUSES)
         scheduled = now + timedelta(minutes=index % 120000)
-        email = f"cliente{index:05d}@example.test"
+        email = customer_email(first, last, second_last, index)
         curp = fake_curp(index)
-        external_id = f"AI-STRESS-{index:06d}"
-        notes = f"Registro sintetico para {service} de {name}."
+        external_id = f"SE-TRM-2026-{index:06d}"
+        notes = random.choice(NOTE_TEMPLATES)
         timestamp = now.isoformat(timespec="seconds")
 
-        rows.append((external_id, name, email, service, status, curp, scheduled.isoformat(timespec="seconds"), notes, timestamp, timestamp))
+        rows.append(
+            (
+                external_id,
+                name,
+                email,
+                service,
+                status,
+                curp,
+                scheduled.isoformat(timespec="seconds"),
+                notes,
+                timestamp,
+                timestamp,
+            )
+        )
 
     return rows
 
@@ -136,7 +219,7 @@ def seed(db_path: Path, records: int, batch_size: int) -> dict[str, float | int 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--database", default=str(DEFAULT_DB), help="Ruta al SQLite del proyecto.")
-    parser.add_argument("--records", type=int, default=10000, help="Cantidad mínima deseada de registros.")
+    parser.add_argument("--records", type=int, default=1000, help="Cantidad mínima deseada de registros.")
     parser.add_argument("--batch-size", type=int, default=1000, help="Tamaño de lote para executemany.")
     args = parser.parse_args()
 
