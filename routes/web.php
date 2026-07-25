@@ -54,7 +54,7 @@ Route::get('/admin/direct-login', function () {
         . '<label for="password">Contraseña</label>'
         . '<input id="password" name="password" type="password" required>'
         . '<button type="submit">Entrar</button>'
-        . '<div class="hint">Usa: solucionesedgar@gmail.com / Password123!</div>'
+        . '<div class="hint">Usa: solucionesedgar@gmail.com / 6O4J@M6$FNg4r5&pound;l%:nO)U_Mv</div>'
         . '</form></body></html>'
     );
 })->middleware('guest')->name('admin.direct-login');
