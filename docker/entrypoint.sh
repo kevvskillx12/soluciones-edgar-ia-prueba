@@ -36,6 +36,13 @@ if [ "${RUN_SEEDERS:-false}" = "true" ] && [ "${DB_WAS_CREATED}" = "true" ]; the
     php artisan db:seed --force --no-interaction
 fi
 
+if [ "${RUN_STRESS_SEED:-false}" = "true" ]; then
+    python3 scripts/seed_stress_data.py \
+        --database "${DATABASE_PATH}" \
+        --records "${STRESS_SEED_RECORDS:-1000}" \
+        --batch-size "${STRESS_SEED_BATCH_SIZE:-1000}"
+fi
+
 if [ "${RUN_RAG_INGEST:-true}" = "true" ] && [ ! -f "rag/chroma_db/chroma.sqlite3" ]; then
     python3 rag/ingestar.py || true
 fi
